@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <cblas.h>
 
 #include "matrix.h"
 /*
@@ -46,13 +47,23 @@ MatrixStatus matrix_add(Matrix* m, Matrix* a, Matrix* b) {
         m->cols != a->cols || a->cols != b->cols)
         return MATRIX_ERROR_INVALID_DIMENSIONS;
 
+    // First we 
+    // cblas_sgeadd c = alpha*a + beta*c
+    cblas_sgeadd(CblasRowMajor, m->rows, m->cols, 1, a->data, a->cols, 0, m->data, m->cols);
+    cblas_sgeadd(CblasRowMajor, m->rows, m->cols, 1, b->data, b->cols, 1, m->data, m->cols);
+
+    /* void cblas_sgeadd(OPENBLAS_CONST enum CBLAS_ORDER CORDER,OPENBLAS_CONST blasint crows, OPENBLAS_CONST blasint ccols, OPENBLAS_CONST float calpha, float *a, OPENBLAS_CONST blasint clda, OPENBLAS_CONST float cbeta, 
+          float *c, OPENBLAS_CONST blasint cldc);
+    */
+
+    /*
     // Add matrices
     for (uint32_t row = 0; row < m->rows; row++) {
         for (uint32_t col = 0; col < m->cols; col++) {
             int rows = row * m->cols;
             m->data[rows + col] = a->data[rows + col] + b->data[rows + col];
         }
-    }
+    }*/
 
     return MATRIX_SUCCESS;
 
@@ -98,6 +109,15 @@ MatrixStatus matrix_mmult(Matrix* m, Matrix* a, Matrix* b) {
     if (m->rows != a->rows || m->cols != b->cols || a->cols != b->rows)
         return MATRIX_ERROR_INVALID_DIMENSIONS;
 
+    // Use cblas single precision generic matrix multiplication method
+    cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, m->rows, m->cols, a->cols, 1, a->data, a->cols, b->data, b->cols, 0, m->data, m->cols);
+
+    /*void cblas_sgemm(const enum CBLAS_ORDER Order, const enum CBLAS_TRANSPOSE TransA,
+                 const enum CBLAS_TRANSPOSE TransB, const int M, const int N,
+                 const int K, const float alpha, const float *A,
+                 const int lda, const float *B, const int ldb,
+                 const float beta, float *C, const int ldc);*/
+    /*
     // Multiply matrices
     for (uint32_t row = 0; row < m->rows; row++) {
         for (uint32_t col = 0; col < m->cols; col++) {
@@ -107,7 +127,7 @@ MatrixStatus matrix_mmult(Matrix* m, Matrix* a, Matrix* b) {
                 m->data[rows + col] += a->data[(row * a->cols) + n] * b->data[(n * b->cols) + col];
             }
         }
-    }
+    }*/
 
     return MATRIX_SUCCESS;
 }

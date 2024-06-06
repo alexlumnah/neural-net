@@ -75,8 +75,9 @@ int main(void) {
     }
 
     // Create neural network
-    uint32_t nodes[3] = {16, 16, 10};
-    NeuralNetwork n = create_neural_network(784, 3, nodes);
+    srand(time(NULL));
+    uint32_t nodes[4] = {100, 32, 32, 10};
+    NeuralNetwork n = create_neural_network(784, 4, nodes);
 
     // Lets do some predictions
     // Lets train our network
@@ -86,7 +87,7 @@ int main(void) {
     printf("Starting Benchmark - Number Right: %d Success Rate: %f\n", success, (float)success/(float)num_test_images);
     for (int i = 0; i < training_iterations; i++) {
         clock_t begin = clock();
-        stochastic_gradient_descent(n, num_to_train, training_images, expected_outputs, 100, 3.0);
+        stochastic_gradient_descent(n, num_to_train, training_images, expected_outputs, 2000, 3.0);
         success = evaluate_network(n, num_test_images, test_images, expected_test_outputs);
         printf("Training Round %d Number Right: %d Success Rate: %f\n", i, success, (float)success/(float)num_test_images);
         printf("Time elapsed: %f\n", (double)(clock() - begin) / (double) CLOCKS_PER_SEC);

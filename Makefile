@@ -2,9 +2,15 @@
 CC = gcc
 
 # Compiler Flags:
-CFLAGS = -g -Wall -Wpedantic -Wextra -fsanitize=address,undefined,signed-integer-overflow
+CFLAGS = -g -Wall -Wpedantic -Wextra -fsanitize=address,undefined,signed-integer-overflow 
+
+# SDL2 flags
 CFLAGS += -I/opt/homebrew/Cellar/sdl2/2.28.5/include/SDL2
 LDFLAGS = -L/opt/homebrew/Cellar/sdl2/2.28.5/lib/ -lSDL2
+
+# openblas flags for fast matrix mulitplication
+CFLAGS += -I/opt/homebrew/opt/openblas/include
+LDFLAGS += -L/opt/homebrew/opt/openblas/lib/ -lopenblas
 
 SRC = $(wildcard src/*.c)
 OBJ = $(SRC:.c=.o)
