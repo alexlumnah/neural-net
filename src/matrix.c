@@ -1,13 +1,16 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <assert.h>
+#include <string.h>
 #include <cblas.h>
 
 #include "matrix.h"
+
 /*
 typedef struct Matrix {
     uint32_t rows, cols;      // Num Rows, Num Cols
-    float data[];       // m x n Matrix - index with m*j + i
+    float data[];             // m x n Matrix - index with m*j + i
 } Matrix;
 */
 
@@ -27,6 +30,9 @@ void matrix_print(Matrix* mat) {
 Matrix* matrix_create(int rows, int cols) {
 
     Matrix* mat = calloc(sizeof(Matrix) + rows * cols * sizeof(float), 1);
+
+    assert(mat != NULL);
+
     mat->rows = rows;
     mat->cols = cols;
 
@@ -39,106 +45,112 @@ void matrix_destroy(Matrix* a) {
         free(a);
 }
 
-// Add Matrices (a + b)
-MatrixStatus matrix_add(Matrix* m, Matrix* a, Matrix* b) {
+// Copy values in a matrix
+void matrix_copy(Matrix* m, Matrix* a) {
 
-    // First confirm matrices have compatible dimensions
-    if (m->rows != a->rows || a->rows != b->rows ||
-        m->cols != a->cols || a->cols != b->cols)
-        return MATRIX_ERROR_INVALID_DIMENSIONS;
+    // Assert matrices have compatible dimensions
+    assert(m->rows == a->rows);
+    assert(m->cols == a->cols);
 
-    // First we 
-    // cblas_sgeadd c = alpha*a + beta*c
+    memcpy(m->data, a->data, sizeof(m->data[0]) * m->rows * m->cols);
+
+}
+
+// Add Matrix  m = m + c * a
+void matrix_add(Matrix* m, float c, Matrix* a) {
+
+    // Assert matrices have compatible dimensions
+    assert(m->rows == a->rows);
+    assert(m->cols == a->cols);
+
+    // First we store a in m, then add b to m
+    // cblas_sgeadd: C = alpha * A + beta * C
+    // cblas_sgeadd(CBLAS_ORDER, rows, cols, alpha, *A, a_width, beta, *C, c_width)
+    cblas_sgeadd(CblasRowMajor, m->rows, m->cols, c, a->data, a->cols, 1, m->data, m->cols);
+
+}
+
+// Compute Sum Matrices m = (a + b)
+void matrix_sum(Matrix* m, Matrix* a, Matrix* b) {
+
+    // Assert matrices have compatible dimensions
+    assert(m->rows == a->rows);
+    assert(a->rows == b->rows);
+    assert(m->cols == a->cols);
+    assert(a->cols == b->cols);
+
+    // First we store a in m, then add b to m
+    // cblas_sgeadd: C = alpha * A + beta * C
+    // cblas_sgeadd(CBLAS_ORDER, rows, cols, alpha, *A, a_width, beta, *C, c_width)
     cblas_sgeadd(CblasRowMajor, m->rows, m->cols, 1, a->data, a->cols, 0, m->data, m->cols);
     cblas_sgeadd(CblasRowMajor, m->rows, m->cols, 1, b->data, b->cols, 1, m->data, m->cols);
 
-    /* void cblas_sgeadd(OPENBLAS_CONST enum CBLAS_ORDER CORDER,OPENBLAS_CONST blasint crows, OPENBLAS_CONST blasint ccols, OPENBLAS_CONST float calpha, float *a, OPENBLAS_CONST blasint clda, OPENBLAS_CONST float cbeta, 
-          float *c, OPENBLAS_CONST blasint cldc);
-    */
-
-    /*
-    // Add matrices
-    for (uint32_t row = 0; row < m->rows; row++) {
-        for (uint32_t col = 0; col < m->cols; col++) {
-            int rows = row * m->cols;
-            m->data[rows + col] = a->data[rows + col] + b->data[rows + col];
-        }
-    }*/
-
-    return MATRIX_SUCCESS;
-
 }
 
-// Subtract Matrices (a - b)
-MatrixStatus matrix_sub(Matrix* m, Matrix* a, Matrix* b) {
+// Compute Difference of Matrices m = (a - b)
+void matrix_diff(Matrix* m, Matrix* a, Matrix* b) {
 
-    // First confirm matrices have compatible dimensions
-    if (m->rows != a->rows || a->rows != b->rows ||
-        m->cols != a->cols || a->cols != b->cols)
-        return MATRIX_ERROR_INVALID_DIMENSIONS;
+    // Assert matrices have compatible dimensions
+    assert(m->rows == a->rows);
+    assert(a->rows == b->rows);
+    assert(m->cols == a->cols);
+    assert(a->cols == b->cols);
 
-    // Subtract matrices
-    for (uint32_t row = 0; row < m->rows; row++) {
-        for (uint32_t col = 0; col < m->cols; col++) {
-            int rows = row * m->cols;
-            m->data[rows + col] = a->data[rows + col] - b->data[rows + col];
-        }
-    }
-
-    return MATRIX_SUCCESS;
+    // First we store a in m, then add -b to m
+    // cblas_sgeadd: C = alpha * A + beta * C
+    // cblas_sgeadd(CBLAS_ORDER, rows, cols, alpha, *A, a_width, beta, *C, c_width)
+    cblas_sgeadd(CblasRowMajor, m->rows, m->cols, 1, a->data, a->cols, 0, m->data, m->cols);
+    cblas_sgeadd(CblasRowMajor, m->rows, m->cols, -1, b->data, b->cols, 1, m->data, m->cols);
 }
 
-// Scalar multiply (c * a)
-MatrixStatus matrix_smult(Matrix* m, Matrix* a, float c) {
+// Scalar multiply m = (c * a)
+void matrix_smult(Matrix* m, Matrix* a, float c) {
 
     // Multiply by Scalar
-    for (uint32_t row = 0; row < m->rows; row++) {
-        for (uint32_t col = 0; col < m->cols; col++) {
-            int rows = row * m->cols;
-            m->data[rows + col] = c * a->data[rows + col];
-        }
-    }
-
-    return MATRIX_SUCCESS;
+    // cblas_sgeadd: C = alpha * A + beta * C
+    // cblas_sgeadd(CBLAS_ORDER, rows, cols, alpha, *A, a_width, beta, *C, c_width)
+    cblas_sgeadd(CblasRowMajor, m->rows, m->cols, c, a->data, a->cols, 0, m->data, m->cols);
 }
 
-// Matrix multiply (a * b)
-MatrixStatus matrix_mmult(Matrix* m, Matrix* a, Matrix* b) {
+// Matrix multiply m = (a * b)
+void matrix_mmult(Matrix* m, Matrix* a, Matrix* b) {
 
-    // First confirm matrices have compatible dimensions
-    if (m->rows != a->rows || m->cols != b->cols || a->cols != b->rows)
-        return MATRIX_ERROR_INVALID_DIMENSIONS;
+    // Assert matrices have compatible dimensions
+    assert(m->rows == a->rows);
+    assert(m->cols == b->cols);
+    assert(a->cols == b->rows);
 
     // Use cblas single precision generic matrix multiplication method
+    // C = alpha * Op(A) * Op(B) + beta * C, where A = m x k, B = k x n, C = m x n matrix
+    // Op(x) = x^T (X-transpose), if specified in argument
+    // cblas_sgemm(CBLAS_ORDER, transpose_A, transpose_B, m, n, k, alpha, *A, a_width, *B, b_width, beta, *C, c_width)
     cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, m->rows, m->cols, a->cols, 1, a->data, a->cols, b->data, b->cols, 0, m->data, m->cols);
 
-    /*void cblas_sgemm(const enum CBLAS_ORDER Order, const enum CBLAS_TRANSPOSE TransA,
-                 const enum CBLAS_TRANSPOSE TransB, const int M, const int N,
-                 const int K, const float alpha, const float *A,
-                 const int lda, const float *B, const int ldb,
-                 const float beta, float *C, const int ldc);*/
-    /*
-    // Multiply matrices
-    for (uint32_t row = 0; row < m->rows; row++) {
-        for (uint32_t col = 0; col < m->cols; col++) {
-            int rows = (row * m->cols);
-            m->data[rows + col] = 0;
-            for (uint32_t n = 0; n < a->cols; n++) {
-                m->data[rows + col] += a->data[(row * a->cols) + n] * b->data[(n * b->cols) + col];
-            }
-        }
-    }*/
-
-    return MATRIX_SUCCESS;
 }
 
-// Hadamard Product (a_i * b_i for all elements i)
-MatrixStatus matrix_hprod(Matrix* m, Matrix* a, Matrix* b) {
+// Complex Matrix Product, Using all the tools cblas has to offer
+void matrix_cmult(Matrix* m, Matrix* a, bool a_t, Matrix* b, bool b_t, float alpha, float beta) {
 
-    // First confirm matrices have compatible dimensions
-    if (m->rows != a->rows || a->rows != b->rows ||
-        m->cols != a->cols || a->cols != b->cols)
-        return MATRIX_ERROR_INVALID_DIMENSIONS;
+    // Assert we have compatible dimensions, even if we are transposing matrices
+    assert(m->rows == (a_t ? a->cols : a->rows));
+    assert(m->cols == (b_t ? b->rows : b->cols));
+    assert((a_t ? a->rows : a->cols) == (b_t ? b->cols : b->rows));
+
+    // Use cblas single precision generic matrix multiplication method
+    // C = alpha * Op(A) * Op(B) + beta * C, where A = m x k, B = k x n, C = m x n matrix
+    // Op(x) = x^T (X-transpose), if specified in argument
+    // cblas_sgemm(CBLAS_ORDER, transpose_A, transpose_B, m, n, k, alpha, *A, a_width, *B, b_width, beta, *C, c_width)
+    cblas_sgemm(CblasRowMajor, a_t ? CblasTrans : CblasNoTrans, b_t ? CblasTrans : CblasNoTrans, m->rows, m->cols, a_t ? a->rows : a->cols, alpha, a->data, a->cols, b->data, b->cols, beta, m->data, m->cols);
+}
+
+// Hadamard Product m = (a_i * b_i for all elements i)
+void matrix_hprod(Matrix* m, Matrix* a, Matrix* b) {
+
+    // Assert matrices have compatible dimensions
+    assert(m->rows == a->rows);
+    assert(a->rows == b->rows);
+    assert(m->cols == a->cols);
+    assert(a->cols == b->cols);
 
     // Multiply elements
     for (uint32_t row = 0; row < m->rows; row++) {
@@ -148,15 +160,14 @@ MatrixStatus matrix_hprod(Matrix* m, Matrix* a, Matrix* b) {
         }
     }
 
-    return MATRIX_SUCCESS;
 }
 
 // Transpose Matrix a, store in m
-MatrixStatus matrix_transpose(Matrix* m, Matrix* a) {
+void matrix_transpose(Matrix* m, Matrix* a) {
 
     // First confirm matrices have compatible dimensions
-    if (m->rows != a->cols || m->cols != a->rows)
-        return MATRIX_ERROR_INVALID_DIMENSIONS;
+    assert(m->rows == a->cols);
+    assert(m->cols == a->rows);
 
     for (uint32_t row = 0; row < m->rows; row++) {
         for (uint32_t col = 0; col < m->cols; col++) {
@@ -165,15 +176,14 @@ MatrixStatus matrix_transpose(Matrix* m, Matrix* a) {
         }
     }
 
-    return MATRIX_SUCCESS;
 }
 
 // Apply activation function to elements of matrix
-MatrixStatus matrix_activation(Matrix* m, Matrix* a, float act(float)) {
+void matrix_activation(Matrix* m, Matrix* a, float act(float)) {
 
     // First confirm matrices have compatible dimensions
-    if (m->rows != a->rows || m->cols != a->cols)
-        return MATRIX_ERROR_INVALID_DIMENSIONS;
+    assert(m->rows == a->rows);
+    assert(m->cols == a->cols);
 
     for (uint32_t row = 0; row < a->rows; row++) {
         for (uint32_t col = 0; col < a->cols; col++) {
@@ -182,7 +192,6 @@ MatrixStatus matrix_activation(Matrix* m, Matrix* a, float act(float)) {
         }
     }
 
-    return MATRIX_SUCCESS;
 }
 
 // Generate random number with guassian distribution using Box_Muller method
@@ -206,13 +215,7 @@ void matrix_initialize_random(Matrix* m) {
     }
 }
 
+// Set all elements to zero
 void matrix_zero(Matrix* m) {
-
-    // Set all values to zero
-    for (uint32_t row = 0; row < m->rows; row++) {
-        for (uint32_t col = 0; col < m->cols; col++) {
-            int rows = row * m->cols;
-            m->data[rows + col] = 0;
-        }
-    }
+    memset(m->data, 0, m->cols * m->rows * sizeof(m->data[0]));
 }
