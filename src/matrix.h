@@ -5,7 +5,7 @@
 
 typedef struct Matrix {
     uint32_t rows, cols;    // Num Rows, Num Cols
-    float data[];           // m x n Matrix - index with m*j + i
+    float data[];           // m x n Matrix - index with m*i + j
 } Matrix;
 
 typedef enum MatrixStatus {

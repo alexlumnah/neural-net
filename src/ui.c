@@ -13,7 +13,7 @@ void draw_pixel(SDL_Renderer* renderer, int row, int col, uint8_t val) {
     SDL_RenderFillRect(renderer, &rect);
 }
 
-void display_image(Matrix* image) {
+void display_image(Matrix* image, uint32_t rows, uint32_t cols) {
 
     // Flags for window and renderer
     int window_flags = 0;
@@ -54,9 +54,9 @@ void display_image(Matrix* image) {
     SDL_RenderClear(renderer);
 
     // Now draw diagram
-    for (uint32_t j = 0; j < image->rows; j++) {
-        for (uint32_t i = 0; i < image->cols; i++) {
-            draw_pixel(renderer, j, i, (uint8_t)image->data[j*image->cols + i]);
+    for (uint32_t j = 0; j < rows; j++) {
+        for (uint32_t i = 0; i < cols; i++) {
+            draw_pixel(renderer, j, i, (uint8_t)(image->data[j * cols + i]*255));
         }
     }
 
