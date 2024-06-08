@@ -12,9 +12,7 @@ size_t load_images(const char* path, Matrix*** images) {
 
     FILE* f = fopen(path, "rb");
 
-    if (f == NULL) {
-        return 0;
-    }
+    if (f == NULL) return -1;
 
     // Read header values
     int32_t magic_number;
@@ -57,9 +55,8 @@ size_t load_labels(const char* path, uint8_t** labels) {
     
     FILE* f = fopen(path, "rb");
 
-    if (f == NULL) {
-        return 0;
-    }
+    if (f == NULL) return -1;
+    
 
     // Read header values
     int32_t magic_number;

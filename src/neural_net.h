@@ -19,15 +19,17 @@ typedef struct NeuralNetwork {
     Layer* layers;          // Array of layers
 } NeuralNetwork;
 
+float calculate_cost(Matrix* exp_output, Matrix* act_output);
 
 NeuralNetwork create_neural_network(uint32_t num_inputs, uint32_t num_layers, const uint32_t* num_nodes); // Instantiate neural network, using random values for weights and biases
 void destroy_neural_network(NeuralNetwork n);   // Destroy neural network and all layers
 
 void forward_propogate(NeuralNetwork n, Matrix* input, Matrix* output);
 void back_propogate(NeuralNetwork n, Matrix* exp_output, Matrix* act_output);
+void gradient_descent(NeuralNetwork n, size_t training_size, Matrix** training_inputs, Matrix** expected_outputs, float eta);
+void stochastic_gradient_descent(NeuralNetwork n, size_t training_size, Matrix** training_inputs, Matrix** training_outputs, size_t num_batches, float eta);
 
-void gradient_descent(NeuralNetwork n, uint32_t training_size, Matrix** training_inputs, Matrix** expected_outputs, float eta);
-void stochastic_gradient_descent(NeuralNetwork n, uint32_t training_size, Matrix** training_inputs, Matrix** training_outputs, uint32_t num_batches, float eta);
-
+int save_neural_network(NeuralNetwork n, const char* path);
+int load_neural_network(const char* path, NeuralNetwork* np);
 
 #endif  // NEURAL_NET_H

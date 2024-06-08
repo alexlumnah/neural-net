@@ -8,8 +8,11 @@
 #include "mnist.h"
 #include "ui.h"
 
+uint8_t guess;
+
 // Find max element in a column matrix
 int find_max(Matrix* m) {
+    
     float max = m->data[0];
     int loc = 0;
     for (uint32_t i = 1; i < m->rows; i++) {
@@ -18,30 +21,32 @@ int find_max(Matrix* m) {
             loc = i;
         }
     }
-
     return loc;
 }
 
-int evaluate_network(NeuralNetwork n, int test_size, Matrix** test_inputs, Matrix** expected_outputs, bool display) {
+// Evaluate network
+void evaluate_network(NeuralNetwork n, size_t test_size, Matrix** test_inputs, Matrix** expected_outputs, size_t* num_correct, float* cost) {
 
-    int count = 0;
+    *num_correct = 0;
+    *cost = 0;
     // Now evaluate every single input, test the output
     Matrix* output = matrix_create(expected_outputs[0]->rows, expected_outputs[0]->cols);
-    for (int i = 0; i < test_size; i++) {
+    for (size_t i = 0; i < test_size; i++) {
         forward_propogate(n, test_inputs[i], output);
         if (find_max(expected_outputs[i]) == find_max(output))
-            count++;
-        else if (display){
-            printf("%d: Expected: %d, Actual: %d\n", i, find_max(expected_outputs[i]), find_max(output));
-            display_image(test_inputs[i], 28, 28);
-        }
+            *num_correct = (*num_correct) + 1;
+        *cost += calculate_cost(expected_outputs[i], output);
     }
+    matrix_destroy(output);
+}
 
-    return count;
-
+void print_guess(void) {
+    printf("Is this your number? %d\n", guess);
 }
 
 int main(void) {
+
+    srand(1);
 
     // Load training images
     size_t num_images;
@@ -81,9 +86,7 @@ int main(void) {
         expected_test_outputs[i]->data[test_labels[i]] = 1.0;
     }
 
-    // Display digit
-    srand(1);
-    
+
     Matrix** variable_images;
     uint8_t* variable_labels;
     size_t num_variable_images;
@@ -91,6 +94,7 @@ int main(void) {
     num_variable_images = extend_set(training_images, training_labels, num_images, &variable_images, &variable_labels);
     
     // Copy new images to end of training images list
+    
     training_images = realloc(training_images, sizeof(Matrix*) * num_images * 2);
     expected_outputs = realloc(expected_outputs, sizeof(Matrix*) * num_images * 2);
     for (size_t i = 0; i < num_images; i++) {
@@ -105,25 +109,60 @@ int main(void) {
         display_image(variable_images[i], 28, 28);
     }*/
 
-    display_image(test_images[3950], 28, 28);
     
     // Create neural network
-    uint32_t nodes[] = {100, 32, 10};
+    uint32_t nodes[] = {100, 100, 16, 10};
     NeuralNetwork n = create_neural_network(784, sizeof(nodes)/sizeof(nodes[0]), nodes);
 
-    // Lets do some predictions
     // Lets train our network
-    int training_iterations = 5;
+    int training_iterations = 7;
     int num_to_train = num_images;
-    int success = evaluate_network(n, num_test_images, test_images, expected_test_outputs, false);
-    printf("Starting Benchmark - Number Right: %d Success Rate: %f\n", success, (float)success/(float)num_test_images);
+    size_t success;
+    float cost;
+    evaluate_network(n, num_test_images, test_images, expected_test_outputs, &success, &cost);
+    printf("Starting Benchmark - Number Right: %zu Success Rate: %f Cost: %f\n", success, (float)success/(float)num_test_images, cost);
     for (int i = 0; i < training_iterations; i++) {
         clock_t begin = clock();
         stochastic_gradient_descent(n, num_to_train, training_images, expected_outputs, 2000, 3.0);
-        success = evaluate_network(n, num_test_images, test_images, expected_test_outputs, false);
-        printf("Training Round %d Number Right: %d Success Rate: %f\n", i, success, (float)success/(float)num_test_images);
+        evaluate_network(n, num_test_images, test_images, expected_test_outputs, &success, &cost);
+        printf("Training Round %d Number Right: %zu Success Rate: %f Cost: %f\n", i, success, (float)success/(float)num_test_images, cost);
         printf("Time elapsed: %f\n", (double)(clock() - begin) / (double) CLOCKS_PER_SEC);
     }
-    //evaluate_network(n, num_test_images, test_images, expected_test_outputs, true);
+
+    // Save my neural network
+    save_neural_network(n, "test_neural_network_varied.txt");
+    
+
+    /*
+    // Load neural network
+    NeuralNetwork n;
+    size_t success;
+    float cost;
+    load_neural_network("test_neural_network.txt", &n);
+    evaluate_network(n, num_test_images, test_images, expected_test_outputs, &success, &cost);
+    printf("Training Round %d Number Right: %zu Success Rate: %f Cost: %f\n", 0, success, (float)success/(float)num_test_images, cost);
+    */
+    init_screen();
+    SDL_Color red = {255, 0, 0, 255};
+    SDL_Color green = {0, 255, 0, 255};
+
+    Matrix* input = get_input_matrix();
+    Matrix* output = matrix_create(10, 1);
+
+    add_button(200, 420, 100, 100, red, clear_inputs);
+    add_button(200, 540, 100, 100, green, print_guess);
+    while (handle_inputs()) {
+        //draw_image(0, 0, training_images[0]);
+        draw_input(400, 200);
+        display_screen();
+        clear_screen();
+
+        // Guess input
+        forward_propogate(n, input, output);
+        guess = find_max(output);
+    }
+    
+    destroy_screen();
+
 
 }

@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <time.h>
+#include <assert.h>
 
 #include "neural_net.h"
 #include "matrix.h"
@@ -30,6 +31,20 @@ float sigmoid(float f) {
 
 float sigmoid_prime(float f) {
     return sigmoid(f) * (1 - sigmoid(f));
+}
+
+float calculate_cost(Matrix* exp_output, Matrix* act_output) {
+
+    assert(exp_output->rows == act_output->rows);
+    assert(exp_output->cols == act_output->cols);
+
+    float cost = 0.0;
+    for (uint32_t n = 0; n < exp_output->rows * exp_output->cols; n++) {
+        cost += pow(exp_output->data[n] - act_output->data[n], 2);
+    }
+
+    return cost;
+
 }
 
 // Instantiate neural network, using random values for weights and biases
@@ -69,6 +84,7 @@ NeuralNetwork create_neural_network(uint32_t num_inputs, uint32_t num_layers, co
     return n;
 }
 
+// Free memory allocated to neural network
 void destroy_neural_network(NeuralNetwork n) {
 
     // Free weights and biases matrices
@@ -86,9 +102,14 @@ void destroy_neural_network(NeuralNetwork n) {
 
 }
 
+// Evaluate inputs to neural network
 void forward_propogate(NeuralNetwork n, Matrix* input, Matrix* output) {
 
-    // TODO: Add dimension checking
+    // Assert input and output have expected dimensions
+    assert(input->rows == n.num_inputs);
+    assert(input->cols == 1);
+    assert(output->rows == n.layers[n.num_layers - 1].num_nodes);
+    assert(output->cols == 1);
 
     // Propogate inputs through first layer
     matrix_mmult(n.layers[0].zed, n.layers[0].weights, input);
@@ -110,6 +131,12 @@ void forward_propogate(NeuralNetwork n, Matrix* input, Matrix* output) {
 
 // Apply Back propogation algorithm
 void back_propogate(NeuralNetwork n, Matrix* input, Matrix* exp_output) {
+
+    // Assert input and output have expected dimensions
+    assert(input->rows == n.num_inputs);
+    assert(input->cols == 1);
+    assert(exp_output->rows == n.layers[n.num_layers - 1].num_nodes);
+    assert(exp_output->cols == 1);
 
     Matrix* act_output = matrix_create(exp_output->rows, exp_output->cols);
 
@@ -158,7 +185,8 @@ void back_propogate(NeuralNetwork n, Matrix* input, Matrix* exp_output) {
 
 }
 
-void gradient_descent(NeuralNetwork n, uint32_t training_size, Matrix** training_inputs, Matrix** expected_outputs, float eta) {
+// Use back-propogation to evaluate gradient, and adjust weights/biases
+void gradient_descent(NeuralNetwork n, size_t training_size, Matrix** training_inputs, Matrix** expected_outputs, float eta) {
 
     // First ensure the gradient matrices in the neural network are zeroed
     for (uint32_t i = 0; i < n.num_layers; i++) {
@@ -182,7 +210,8 @@ void gradient_descent(NeuralNetwork n, uint32_t training_size, Matrix** training
 
 }
 
-void shuffle_arrays(uint32_t array_size, Matrix** array1, Matrix** array2) {
+// Shuffle two input arrays identically
+void shuffle_arrays(size_t array_size, Matrix** array1, Matrix** array2) {
 
     int rand_loc;
     Matrix* m1;
@@ -198,8 +227,8 @@ void shuffle_arrays(uint32_t array_size, Matrix** array1, Matrix** array2) {
     }
 }
 
-
-void stochastic_gradient_descent(NeuralNetwork n, uint32_t training_size, Matrix** training_inputs, Matrix** training_outputs, uint32_t num_batches, float eta) {
+// Apply stochastic gradient descent algorithm
+void stochastic_gradient_descent(NeuralNetwork n, size_t training_size, Matrix** training_inputs, Matrix** training_outputs, size_t num_batches, float eta) {
 
     // First get subsets of training data for training
     Matrix** inputs = calloc(sizeof(Matrix*), training_size);
@@ -224,3 +253,127 @@ void stochastic_gradient_descent(NeuralNetwork n, uint32_t training_size, Matrix
     free(outputs);
 
 }
+
+void write_matrix(FILE* f, Matrix* m) {
+
+    // Write rows
+    uint32_t rows = htons(m->rows);
+    fwrite(&rows, sizeof(rows), 1, f);
+
+    // Write cols
+    uint32_t cols = htons(m->cols);
+    fwrite(&cols, sizeof(cols), 1, f);
+
+    // Write data
+    fwrite(m->data, sizeof(m->data[0]), m->rows * m->cols, f);
+}
+
+// Read matrix from file, and store in provided matrix
+int read_matrix(FILE* f, Matrix* m) {
+
+    size_t bytes;
+
+    // Read rows
+    uint32_t rows;
+    bytes = fread(&rows, sizeof(rows), 1, f);
+    rows = ntohs(rows);
+    if (bytes != 1) return -1;
+    
+    // Read cols
+    uint32_t cols;
+    bytes = fread(&cols, sizeof(cols), 1, f);
+    cols = ntohs(cols);
+    if (bytes != 1) return -1;
+
+    // Confirm matrix has proper dimensions
+    if (m->rows != rows || m->cols != cols) {
+        return -1;
+    }
+
+    // Read data
+    bytes = fread(m->data, sizeof(m->data[0]), rows * cols, f);
+    if (bytes != rows * cols) return -1;
+
+    return 0;
+}
+
+// Save neural network to file
+int save_neural_network(NeuralNetwork n, const char* path) {
+
+    FILE *f = fopen(path, "wb");
+
+    if (f == NULL) return -1;
+
+    // Write number of inputs
+    uint32_t num_inputs = htons(n.num_inputs);
+    fwrite(&num_inputs, sizeof(num_inputs), 1, f);
+
+    // Write total number of layers
+    uint32_t num_layers = htons(n.num_layers);
+    fwrite(&num_layers, sizeof(num_layers), 1, f);
+
+    // Write total number of nodes in each layer
+    for (uint32_t i = 0; i < n.num_layers; i++) {
+        uint32_t num_nodes = htons(n.layers[i].num_nodes);
+        fwrite(&num_nodes, sizeof(num_nodes), 1, f);
+    }
+
+    // Now save each parameter set
+    for (uint32_t i = 0; i < n.num_layers; i++) {
+
+        // Write parameter matrices
+        write_matrix(f, n.layers[i].weights);
+        write_matrix(f, n.layers[i].biases);
+    }
+
+    return 0;
+}
+
+// Load neural network from file, store in pointer
+int load_neural_network(const char* path, NeuralNetwork* np) {
+
+    FILE *f = fopen(path, "rb");
+
+    if (f == NULL) return -1;
+
+    int bytes;
+
+    // Write number of inputs
+    uint32_t num_inputs;
+    bytes = fread(&num_inputs, sizeof(num_inputs), 1, f);
+    num_inputs = ntohs(num_inputs);
+    if (bytes != 1) return -1;
+
+    // Write total number of layers
+    uint32_t num_layers;
+    bytes = fread(&num_layers, sizeof(num_layers), 1, f);
+    num_layers = ntohs(num_layers);
+    if (bytes != 1) return -1;
+
+    // Read total number of nodes in each layer
+    uint32_t num_nodes[num_layers];
+    for (uint32_t i = 0; i < num_layers; i++) {
+        bytes = fread(&num_nodes[i], sizeof(num_nodes[0]), 1, f);
+        num_nodes[i] = ntohs(num_nodes[i]);
+        if (bytes != 1) return -1;
+    }
+
+    // Create the neural network
+    NeuralNetwork n = create_neural_network(num_inputs, num_layers, num_nodes);
+
+    // Now save each parameter set
+    for (uint32_t i = 0; i < num_layers; i++) {
+        // Read weights
+        int status = read_matrix(f, n.layers[i].weights);
+        if (status != 0) return -1;
+
+        // Read biases
+        status = read_matrix(f, n.layers[i].biases);
+        if (status != 0) return -1;
+    }
+
+    *np = n;
+
+    return 0;
+}
+
