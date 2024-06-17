@@ -3,14 +3,21 @@
 
 #include "matrix.h"
 
+typedef enum ActivationFunction {
+    ACT_SIGMOID,
+    ACT_RELU,
+    ACT_TANH,
+} ActivationFunction;
+
 typedef struct Layer {
-    uint32_t num_nodes; // Number of nodes in this layer
-    Matrix* weights;    // Matrix containing input weights into this layer
-    Matrix* biases;     // Matrix containing output bias for this layer
-    Matrix* zed;        // Matrix storing result of weights * input + bias
-    Matrix* output;     // Matrix for storing output of layer during computations
-    Matrix* w_grad;     // Matrix for storing weight gradient during back propagation
-    Matrix* b_grad;     // Matrix for storing bias gradient during back propagation
+    uint32_t num_nodes; // Number of nodes
+    Matrix* w;          // Weights
+    Matrix* b;          // Biases
+    Matrix* z;          // Z
+    Matrix* a;          // Neuron Activation
+    Matrix* e;          // Layer Error
+    Matrix* w_g;        // Weight Gradient
+    Matrix* b_g;        // Bias Gradient
 } Layer;
 
 typedef struct NeuralNetwork {

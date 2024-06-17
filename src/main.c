@@ -60,8 +60,8 @@ int main(void) {
     // Split out a validation set
     size_t num_val_images = 10000;
     num_images = num_images - num_val_images;
-    Matrix** val_images = &training_images[num_images];
-    uint8_t* val_labels = &training_labels[num_images];
+    //Matrix** val_images = &training_images[num_images];
+    //uint8_t* val_labels = &training_labels[num_images];
 
     // Generate matrix of expected outputs
     Matrix** expected_outputs = calloc(sizeof(Matrix*), num_labels);
@@ -86,7 +86,8 @@ int main(void) {
         expected_test_outputs[i]->data[test_labels[i]] = 1.0;
     }
 
-
+/*
+   // Extend training set by manipulating training inputs
     Matrix** variable_images;
     uint8_t* variable_labels;
     size_t num_variable_images;
@@ -102,20 +103,14 @@ int main(void) {
         expected_outputs[num_images + i] = expected_outputs[i];
     }
     num_images *= 2;
-    
-    /*
-    for (int i = 0; i < 10; i++) {
-        printf("%d: %d\n", i, test_labels[i]);
-        display_image(variable_images[i], 28, 28);
-    }*/
+   */ 
 
-    
     // Create neural network
     uint32_t nodes[] = {100, 100, 16, 10};
     NeuralNetwork n = create_neural_network(784, sizeof(nodes)/sizeof(nodes[0]), nodes);
 
     // Lets train our network
-    int training_iterations = 7;
+    int training_iterations = 30;
     int num_to_train = num_images;
     size_t success;
     float cost;
@@ -130,7 +125,7 @@ int main(void) {
     }
 
     // Save my neural network
-    save_neural_network(n, "test_neural_network_varied.txt");
+    //save_neural_network(n, "test_neural_network_varied.txt");
     
 
     /*

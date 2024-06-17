@@ -181,7 +181,7 @@ void mouse_click(int x, int y) {
 }
 
 void clear_inputs(void) {
-    for (int i = 0; i < screen.input->rows * screen.input->cols; i++) {
+    for (uint32_t i = 0; i < screen.input->rows * screen.input->cols; i++) {
         screen.input->data[i] = 0;
     }
 }
