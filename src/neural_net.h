@@ -3,11 +3,12 @@
 
 #include "matrix.h"
 
-typedef enum ActivationFunction {
+typedef enum ActFun {
     ACT_SIGMOID,
     ACT_RELU,
     ACT_TANH,
-} ActivationFunction;
+    ACT_SOFTMAX,
+} ActFun;
 
 typedef struct Layer {
     uint32_t num_nodes; // Number of nodes

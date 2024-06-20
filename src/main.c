@@ -8,7 +8,52 @@
 #include "mnist.h"
 #include "ui.h"
 
-uint8_t guess;
+
+void print_guess(Button* but) {
+    printf("Is this your number? %d\n", (*(uint8_t*)but->state));
+}
+
+void clear_inputs(Button* but) {
+    Matrix* m = (Matrix*)but->state;
+    for (uint32_t i = 0; i < m->rows; i++) {
+        for (uint32_t j = 0; j < m->cols; j++) {
+            m->data[i * m->cols + j] = 0.0f;
+        }
+    }
+}
+
+void update_image(int x, int y, Image* img) {
+    
+    Matrix* m = img->m;
+
+    if (x > img->r.x && x < img->r.x + IMG_COLS * PIXEL_SIZE &&
+        y > img->r.y && y < img->r.y + IMG_ROWS * PIXEL_SIZE) {
+        uint32_t in_col = (x - img->r.x - PIXEL_SIZE/2) / PIXEL_SIZE;
+        uint32_t in_row = (y - img->r.y - PIXEL_SIZE/2) / PIXEL_SIZE;
+        float col_f = (float)((x - img->r.x - PIXEL_SIZE/2) % PIXEL_SIZE) / (float)PIXEL_SIZE;
+        float row_f = (float)((y - img->r.y - PIXEL_SIZE/2) % PIXEL_SIZE) / (float)PIXEL_SIZE;
+
+        col_f = col_f < 0 ? 0 : col_f;
+        row_f = row_f < 0 ? 0 : row_f;
+
+        m->data[in_row * IMG_COLS + in_col] += 1.0 * (1 - col_f) * (1 - row_f);
+        m->data[in_row * IMG_COLS + in_col] = m->data[in_row * IMG_COLS + in_col] > 1 ? 1 : m->data[in_row * IMG_COLS + in_col];
+
+        if (in_col + 1 < IMG_COLS){
+            m->data[in_row * IMG_COLS + in_col + 1] += 1.0 * col_f * (1 - row_f);
+            m->data[in_row * IMG_COLS + in_col + 1] = m->data[in_row * IMG_COLS + in_col + 1] > 1 ? 1 : m->data[in_row * IMG_COLS + in_col + 1];
+        }
+        if (in_row + 1 < IMG_ROWS) {
+            m->data[(in_row + 1) * IMG_COLS + in_col] += 1.0 * (1 - col_f) * (1 - row_f);
+            m->data[(in_row + 1) * IMG_COLS + in_col] = m->data[(in_row + 1) * IMG_COLS + in_col] > 1 ? 1 : m->data[(in_row + 1) * IMG_COLS + in_col];
+        }
+        if (in_row + 1 < IMG_ROWS && in_col + 1 < IMG_COLS) {
+            m->data[(in_row + 1) * IMG_COLS + in_col + 1] += 1.0 * col_f * row_f;
+            m->data[(in_row + 1) * IMG_COLS + in_col + 1] = m->data[(in_row + 1) * IMG_COLS + in_col + 1] > 1 ? 1 : m->data[(in_row + 1) * IMG_COLS + in_col + 1];
+        }
+
+    }
+}
 
 // Find max element in a column matrix
 int find_max(Matrix* m) {
@@ -38,10 +83,6 @@ void evaluate_network(NeuralNetwork n, size_t test_size, Matrix** test_inputs, M
         *cost += calculate_cost(expected_outputs[i], output);
     }
     matrix_destroy(output);
-}
-
-void print_guess(void) {
-    printf("Is this your number? %d\n", guess);
 }
 
 int main(void) {
@@ -106,23 +147,35 @@ int main(void) {
    */ 
 
     // Create neural network
-    uint32_t nodes[] = {100, 100, 16, 10};
+    uint32_t nodes[] = {16, 16, 16, 16, 16, 10};
     NeuralNetwork n = create_neural_network(784, sizeof(nodes)/sizeof(nodes[0]), nodes);
 
+    init_screen();
+    clear_screen();
+    draw_neural_net(RECT(800, 100, 600, 600), n);
+    display_screen();
+    handle_inputs();
+
     // Lets train our network
-    int training_iterations = 30;
+    int training_iterations = 20;
     int num_to_train = num_images;
     size_t success;
     float cost;
     evaluate_network(n, num_test_images, test_images, expected_test_outputs, &success, &cost);
     printf("Starting Benchmark - Number Right: %zu Success Rate: %f Cost: %f\n", success, (float)success/(float)num_test_images, cost);
     for (int i = 0; i < training_iterations; i++) {
+        clear_screen();
+        draw_neural_net(RECT(800, 100, 600, 600), n);
+        display_screen();
+        handle_inputs();
         clock_t begin = clock();
-        stochastic_gradient_descent(n, num_to_train, training_images, expected_outputs, 2000, 3.0);
+        stochastic_gradient_descent(n, num_to_train, training_images, expected_outputs, 2000, 0.5);
         evaluate_network(n, num_test_images, test_images, expected_test_outputs, &success, &cost);
         printf("Training Round %d Number Right: %zu Success Rate: %f Cost: %f\n", i, success, (float)success/(float)num_test_images, cost);
         printf("Time elapsed: %f\n", (double)(clock() - begin) / (double) CLOCKS_PER_SEC);
     }
+
+    destroy_screen();
 
     // Save my neural network
     //save_neural_network(n, "test_neural_network_varied.txt");
@@ -138,19 +191,19 @@ int main(void) {
     printf("Training Round %d Number Right: %zu Success Rate: %f Cost: %f\n", 0, success, (float)success/(float)num_test_images, cost);
     */
     init_screen();
-    SDL_Color red = {255, 0, 0, 255};
-    SDL_Color green = {0, 255, 0, 255};
 
-    Matrix* input = get_input_matrix();
     Matrix* output = matrix_create(10, 1);
+    Matrix* input = matrix_create(784, 1);
+    uint8_t guess;
 
-    add_button(200, 420, 100, 100, red, clear_inputs);
-    add_button(200, 540, 100, 100, green, print_guess);
+    add_button(RECT(200, 200, 100, 100), GREEN, print_guess, (void*)&guess);
+    add_button(RECT(200, 400, 100, 100), RED, clear_inputs, (void*)input);
+    add_image(400, 200, input, update_image, NULL);
+
     while (handle_inputs()) {
-        //draw_image(0, 0, training_images[0]);
-        draw_input(400, 200);
-        display_screen();
         clear_screen();
+        draw_neural_net(RECT(800, 100, 600, 600), n);
+        display_screen();
 
         // Guess input
         forward_propogate(n, input, output);
