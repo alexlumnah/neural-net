@@ -82,6 +82,7 @@ void draw_neural_net(SDL_Rect r, NeuralNetwork n) {
                     n_rad);
     }
 
+    SDL_SetRenderDrawColor(screen.renderer, 255, 255, 255, 255);
     SDL_RenderDrawRect(screen.renderer, &r);
         
 }

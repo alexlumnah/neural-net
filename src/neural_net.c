@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <math.h>
 #include <time.h>
+#include <math.h>
 #include <assert.h>
 
 #include "neural_net.h"
@@ -46,14 +46,6 @@ typedef struct NeuralNetwork {
 } NeuralNetwork;
 */
 
-float sigmoid(float f) {
-    return 1.0 / (1.0 + exp(-1.0 * f));
-}
-
-float sigmoid_prime(float f) {
-    return sigmoid(f) * (1 - sigmoid(f));
-}
-
 float calculate_cost(Matrix* exp_output, Matrix* act_output) {
 
     assert(exp_output->rows == act_output->rows);
@@ -86,6 +78,8 @@ NeuralNetwork create_neural_network(uint32_t num_inputs, uint32_t num_layers, co
     for (uint32_t i = 1; i <= num_layers; i++) {
         uint32_t nodes = num_nodes[i - 1];
         n.layers[i].num_nodes = nodes;
+        n.layers[i].act_fun = act_sigmoid;
+        n.layers[i].act_pri = act_sigmoid_prime;
         n.layers[i].w = matrix_create(nodes, n.layers[i - 1].num_nodes);
         n.layers[i].b = matrix_create(nodes, 1);
         n.layers[i].z = matrix_create(nodes, 1);
@@ -93,8 +87,11 @@ NeuralNetwork create_neural_network(uint32_t num_inputs, uint32_t num_layers, co
         n.layers[i].e = matrix_create(nodes, 1);
         n.layers[i].w_g = matrix_create(nodes, n.layers[i - 1].num_nodes);
         n.layers[i].b_g = matrix_create(nodes, 1);
+        n.layers[i].c_g = matrix_create(nodes, 1);
+        n.layers[i].a_j = matrix_create(nodes, nodes);
         matrix_initialize_random(n.layers[i].w);
         matrix_initialize_random(n.layers[i].b);
+        set_act_fun(n, i, ACT_SIGMOID);
     }
 
     return n;
@@ -112,11 +109,34 @@ void destroy_neural_network(NeuralNetwork n) {
         matrix_destroy(n.layers[i].e);
         matrix_destroy(n.layers[i].w_g);
         matrix_destroy(n.layers[i].b_g);
+        matrix_destroy(n.layers[i].c_g);
+        matrix_destroy(n.layers[i].a_j);
     }
 
     // Free list of layers
     free(n.layers);
 
+}
+
+void set_act_fun(NeuralNetwork n, uint32_t layer, ActType type) {
+    switch (type) {
+        case ACT_SIGMOID:
+            n.layers[layer].act_fun = act_sigmoid;
+            n.layers[layer].act_pri = act_sigmoid_prime;
+            break;
+        case ACT_RELU:
+            n.layers[layer].act_fun = act_relu;
+            n.layers[layer].act_pri = act_relu_prime;
+            break;
+        case ACT_TANH:
+            n.layers[layer].act_fun = act_tanh;
+            n.layers[layer].act_pri = act_tanh_prime;
+            break;
+        case ACT_SOFTMAX:
+            n.layers[layer].act_fun = act_softmax;
+            n.layers[layer].act_pri = act_softmax_prime;
+            break;
+    }
 }
 
 // Evaluate inputs to neural network, store in output if provided
@@ -139,7 +159,7 @@ void forward_propogate(NeuralNetwork n, Matrix* input, Matrix* output) {
         // Multiply matrics
         matrix_mmult(n.layers[i].z, n.layers[i].w, n.layers[i - 1].a);
         matrix_add(n.layers[i].z, 1, n.layers[i].b);
-        matrix_activation(n.layers[i].a, n.layers[i].z, sigmoid);
+        n.layers[i].act_fun(n.layers[i].a, n.layers[i].z);
     }
 
     // If output matrix is provided, copy data to output
@@ -161,23 +181,40 @@ void back_propogate(NeuralNetwork n, Matrix* input, Matrix* exp_output) {
 
     // Calculate error for the last layer
     uint32_t L = n.num_layers;
-    matrix_diff(n.layers[L].e, n.layers[L].a, exp_output);
-    matrix_activation(n.layers[L].z, n.layers[L].z, sigmoid_prime);
-    matrix_hprod(n.layers[L].e, n.layers[L].e, n.layers[L].z);
+    matrix_diff(n.layers[L].c_g, n.layers[L].a, exp_output);
+    n.layers[L].act_pri(n.layers[L].a_j, n.layers[L].a);
+    matrix_cmult(n.layers[L].e,
+                 n.layers[L].a_j, true, 
+                 n.layers[L].c_g, false, 
+                 1.0f, 0.0f);
 
     // Calculate gradients
-    matrix_cmult(n.layers[L].w_g, n.layers[L].e, false, n.layers[L-1].a, true, 1.0, 1.0);
+    matrix_cmult(n.layers[L].w_g,
+                 n.layers[L].e, false, 
+                 n.layers[L-1].a, true, 
+                 1.0f, 1.0f);
     matrix_add(n.layers[L].b_g, 1.0, n.layers[L].e);
 
     // Now propogate backwards through remaining layers
     for (int i = n.num_layers - 1; i >= 1; i--) {
         // Calculate error for this layer
-        matrix_cmult(n.layers[i].e, n.layers[i+1].w, true, n.layers[i+1].e, false, 1.0, 0.0);
-        matrix_activation(n.layers[i].z, n.layers[i].z, sigmoid_prime);
-        matrix_hprod(n.layers[i].e, n.layers[i].e, n.layers[i].z);
+        n.layers[i].act_pri(n.layers[i].a_j, n.layers[i].a);
+        Matrix* m = matrix_create(n.layers[i].num_nodes, n.layers[i+1].num_nodes);
+        matrix_cmult(m,
+                     n.layers[i].a_j, true, 
+                     n.layers[i+1].w, true,
+                     1.0, 0.0);
+        matrix_cmult(n.layers[i].e,
+                     m, false, 
+                     n.layers[i+1].e, false,
+                     1.0, 0.0);
+        matrix_destroy(m);
         
         // Calculate gradients
-        matrix_cmult(n.layers[i].w_g, n.layers[i].e, false, n.layers[i-1].a, true, 1.0, 1.0);
+        matrix_cmult(n.layers[i].w_g,
+                     n.layers[i].e, false,
+                     n.layers[i-1].a, true,
+                     1.0, 1.0);
         matrix_add(n.layers[i].b_g, 1.0, n.layers[i].e);
     }
 

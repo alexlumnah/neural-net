@@ -147,8 +147,9 @@ int main(void) {
    */ 
 
     // Create neural network
-    uint32_t nodes[] = {16, 16, 16, 16, 16, 10};
+    uint32_t nodes[] = {10, 16, 10};//, 16, 16, 16, 10};
     NeuralNetwork n = create_neural_network(784, sizeof(nodes)/sizeof(nodes[0]), nodes);
+    set_act_fun(n, sizeof(nodes)/sizeof(nodes[0]), ACT_SOFTMAX);
 
     init_screen();
     clear_screen();
@@ -157,8 +158,9 @@ int main(void) {
     handle_inputs();
 
     // Lets train our network
-    int training_iterations = 20;
+    int training_iterations = 30;
     int num_to_train = num_images;
+    int batch_size = 30;
     size_t success;
     float cost;
     evaluate_network(n, num_test_images, test_images, expected_test_outputs, &success, &cost);
@@ -169,7 +171,7 @@ int main(void) {
         display_screen();
         handle_inputs();
         clock_t begin = clock();
-        stochastic_gradient_descent(n, num_to_train, training_images, expected_outputs, 2000, 0.5);
+        stochastic_gradient_descent(n, num_to_train, training_images, expected_outputs, num_to_train/batch_size, 0.5);
         evaluate_network(n, num_test_images, test_images, expected_test_outputs, &success, &cost);
         printf("Training Round %d Number Right: %zu Success Rate: %f Cost: %f\n", i, success, (float)success/(float)num_test_images, cost);
         printf("Time elapsed: %f\n", (double)(clock() - begin) / (double) CLOCKS_PER_SEC);

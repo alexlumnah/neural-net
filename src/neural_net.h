@@ -2,16 +2,14 @@
 #define NEURAL_NET_H
 
 #include "matrix.h"
+#include "activation.h"
 
-typedef enum ActFun {
-    ACT_SIGMOID,
-    ACT_RELU,
-    ACT_TANH,
-    ACT_SOFTMAX,
-} ActFun;
+typedef void (*ActFun)(Matrix*, Matrix*);
 
 typedef struct Layer {
     uint32_t num_nodes; // Number of nodes
+    ActFun act_fun;     // Activation Function
+    ActFun act_pri;     // Derivative 
     Matrix* w;          // Weights
     Matrix* b;          // Biases
     Matrix* z;          // Z
@@ -19,6 +17,8 @@ typedef struct Layer {
     Matrix* e;          // Layer Error
     Matrix* w_g;        // Weight Gradient
     Matrix* b_g;        // Bias Gradient
+    Matrix* c_g;        // Cost Gradient
+    Matrix* a_j;        // Activation jacobian
 } Layer;
 
 typedef struct NeuralNetwork {
@@ -37,7 +37,9 @@ void back_propogate(NeuralNetwork n, Matrix* exp_output, Matrix* act_output);
 void gradient_descent(NeuralNetwork n, size_t training_size, Matrix** training_inputs, Matrix** expected_outputs, float eta);
 void stochastic_gradient_descent(NeuralNetwork n, size_t training_size, Matrix** training_inputs, Matrix** training_outputs, size_t num_batches, float eta);
 
+void set_act_fun(NeuralNetwork n, uint32_t layer, ActType type);
 int save_neural_network(NeuralNetwork n, const char* path);
 int load_neural_network(const char* path, NeuralNetwork* np);
 
 #endif  // NEURAL_NET_H
+
