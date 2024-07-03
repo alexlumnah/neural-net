@@ -8,6 +8,7 @@
 #include "mnist.h"
 #include "ui.h"
 
+#define count(list) sizeof(list)/sizeof(list[0])
 
 void print_guess(Button* but) {
     printf("Is this your number? %d\n", (*(uint8_t*)but->state));
@@ -147,40 +148,65 @@ int main(void) {
    */ 
 
     // Create neural network
-    uint32_t nodes[] = {10, 16, 10};//, 16, 16, 16, 10};
-    NeuralNetwork n = create_neural_network(784, sizeof(nodes)/sizeof(nodes[0]), nodes);
-    set_act_fun(n, sizeof(nodes)/sizeof(nodes[0]), ACT_SOFTMAX);
+    uint32_t nodes[] = {16, 16, 16, 10};
+    NeuralNetwork n = create_neural_network(784, count(nodes), nodes);
+    set_act_fun(n, 1, ACT_SIGMOID);
+    set_act_fun(n, 2, ACT_RELU);
+    set_act_fun(n, 3, ACT_TANH);
+    set_act_fun(n, count(nodes), ACT_SOFTMAX);
 
+    // Initialize screen
+    SDL_Rect net_box = RECT(800, 100, 600, 600);
     init_screen();
     clear_screen();
-    draw_neural_net(RECT(800, 100, 600, 600), n);
+    draw_neural_net(net_box, n);
     display_screen();
     handle_inputs();
 
     // Lets train our network
-    int training_iterations = 30;
-    int num_to_train = num_images;
+    int num_epochs = 5;
     int batch_size = 30;
+    float learning_rate = 0.2;
+
+    // Print out hyper parameters
+    printf("Training Neural Network\n");
+    print_neural_network(n);
+    printf("Total Training Images: %lu\n", num_images);
+    printf("Total Test Images: %lu\n", num_test_images);
+    printf("Hyperparameters\n");
+    printf("Epochs: %d\n", num_epochs);
+    printf("Batch Size: %d\n", batch_size);
+    printf("Learning Rates: %f\n\n", learning_rate);
+
+    // Evaluate starting benchmark
     size_t success;
     float cost;
     evaluate_network(n, num_test_images, test_images, expected_test_outputs, &success, &cost);
     printf("Starting Benchmark - Number Right: %zu Success Rate: %f Cost: %f\n", success, (float)success/(float)num_test_images, cost);
-    for (int i = 0; i < training_iterations; i++) {
+
+    // Loop over each epoch
+    for (int i = 0; i < num_epochs; i++) {
+
+        // Train Network
+        clock_t begin = clock();
+        stochastic_gradient_descent(n, num_images, training_images, expected_outputs, num_images/batch_size, learning_rate);
+
+        // Evaluate and print performance
+        evaluate_network(n, num_test_images, test_images, expected_test_outputs, &success, &cost);
+        printf("Training Round %d Number Right: %zu Success Rate: %f Cost: %f\n", i, success, (float)success/(float)num_test_images, cost);
+        printf("Time elapsed: %f\n", (double)(clock() - begin) / (double) CLOCKS_PER_SEC);
+
+        // Draw updated neural network
         clear_screen();
         draw_neural_net(RECT(800, 100, 600, 600), n);
         display_screen();
         handle_inputs();
-        clock_t begin = clock();
-        stochastic_gradient_descent(n, num_to_train, training_images, expected_outputs, num_to_train/batch_size, 0.5);
-        evaluate_network(n, num_test_images, test_images, expected_test_outputs, &success, &cost);
-        printf("Training Round %d Number Right: %zu Success Rate: %f Cost: %f\n", i, success, (float)success/(float)num_test_images, cost);
-        printf("Time elapsed: %f\n", (double)(clock() - begin) / (double) CLOCKS_PER_SEC);
     }
 
     destroy_screen();
 
     // Save my neural network
-    //save_neural_network(n, "test_neural_network_varied.txt");
+    // save_neural_network(n, "test_neural_network_varied.txt");
     
 
     /*
@@ -192,6 +218,8 @@ int main(void) {
     evaluate_network(n, num_test_images, test_images, expected_test_outputs, &success, &cost);
     printf("Training Round %d Number Right: %zu Success Rate: %f Cost: %f\n", 0, success, (float)success/(float)num_test_images, cost);
     */
+
+    // Create window where you can draw numbers and classify them
     init_screen();
 
     Matrix* output = matrix_create(10, 1);

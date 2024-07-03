@@ -9,42 +9,17 @@
 
 /* TODO
    x Use new error matrix inside each layer
-   - Test save/load functionality
-   - Allow each layer to have a unique activation function
+   x Allow each layer to have a unique activation function
    - Rename nodes to neurons
    - Different cost functions?
+   - Update save/load functionality
 
 Eventually:
   - Plot cost over time
-  - Plot image of neural network
+  x Plot image of neural network
   - Plot weights and activations as an image
 */
 
-/*
-typedef enum ActFun {
-    ACT_SIGMOID,
-    ACT_RELU,
-    ACT_TANH,
-    ACT_SOFTMAX,
-} ActFun;
-
-typedef struct Layer {
-    uint32_t num_nodes; // Number of nodes
-    Matrix* w;          // Weights
-    Matrix* b;          // Biases
-    Matrix* z;          // Z
-    Matrix* a;          // Neuron Activation
-    Matrix* e;          // Layer Error
-    Matrix* w_g;        // Weight Gradient
-    Matrix* b_g;        // Bias Gradient
-} Layer;
-
-typedef struct NeuralNetwork {
-    uint32_t num_inputs;    // Number of inputs
-    uint32_t num_layers;    // Number of layers in the network
-    Layer* layers;          // Array of layers
-} NeuralNetwork;
-*/
 
 float calculate_cost(Matrix* exp_output, Matrix* act_output) {
 
@@ -58,6 +33,17 @@ float calculate_cost(Matrix* exp_output, Matrix* act_output) {
 
     return cost;
 
+}
+
+// Print Neural Network
+void print_neural_network(NeuralNetwork n) {
+
+    printf("%u -> {", n.num_inputs);
+    for (uint32_t i = 1; i < n.num_layers; i++) {
+        printf("%u", n.layers[i].num_nodes);
+        if (i + 1 < n.num_layers) printf(", ");
+    }
+    printf("} -> %u\n", n.layers[n.num_layers].num_nodes);
 }
 
 // Instantiate neural network, using random values for weights and biases
@@ -91,7 +77,7 @@ NeuralNetwork create_neural_network(uint32_t num_inputs, uint32_t num_layers, co
         n.layers[i].a_j = matrix_create(nodes, nodes);
         matrix_initialize_random(n.layers[i].w);
         matrix_initialize_random(n.layers[i].b);
-        set_act_fun(n, i, ACT_SIGMOID);
+        set_act_fun(n, i, ACT_TANH);
     }
 
     return n;

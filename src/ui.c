@@ -39,13 +39,13 @@ void draw_neural_net(SDL_Rect r, NeuralNetwork n) {
     // Draw neurons
     int n_rad = 15;
     int l_space = (r.w - 2 * n_rad) / (n.num_layers - 1);
-    for (uint32_t i = 1; i < n.num_layers; i++) {
+    for (uint32_t i = n.num_layers; i > 1; i--) {
         int n0_space = r.h / (n.layers[i].num_nodes + 1);
         for (uint32_t j = 0; j < n.layers[i].num_nodes; j++) {
             int x0 = r.x + n_rad;
             int y0 = r.y + n_rad + n0_space/2;
-            for (uint32_t k = 0; k < n.layers[i+1].num_nodes; k++) {
-                int n1_space = r.h / (n.layers[i+1].num_nodes + 1);
+            for (uint32_t k = 0; k < n.layers[i-1].num_nodes; k++) {
+                int n1_space = r.h / (n.layers[i-1].num_nodes + 1);
                 int x1 = r.x + n_rad;
                 int y1 = r.y + n_rad + n1_space/2;
                 float w = n.layers[i].w->data[j * n.layers[i].w->cols + k];
@@ -55,7 +55,7 @@ void draw_neural_net(SDL_Rect r, NeuralNetwork n) {
                 SDL_RenderDrawLine( screen.renderer,
                                     x0 + l_space * (i - 1),
                                     y0 + n0_space * j,
-                                    x1 + l_space * (i),
+                                    x1 + l_space * (i - 2),
                                     y1 + n1_space * k);
             }
             float w = n.layers[i].b->data[j];
@@ -68,16 +68,16 @@ void draw_neural_net(SDL_Rect r, NeuralNetwork n) {
         }
     }
 
-    // Draw final layer of neurons
-    for (uint32_t j = 0; j < n.layers[n.num_layers].num_nodes; j++) {
-        int n_space = r.h / (n.layers[n.num_layers].num_nodes + 1);
+    // Draw first layer of neurons
+    for (uint32_t j = 0; j < n.layers[1].num_nodes; j++) {
+        int n_space = r.h / (n.layers[1].num_nodes + 1);
         int x0 = r.x + n_rad;
         int y0 = r.y + n_rad + n_space/2;
-        float w = n.layers[n.num_layers].b->data[j];
+        float w = n.layers[1].b->data[j];
         uint32_t red = w < 0 ? (uint8_t)255*(w/min_bias) : 0;
         uint32_t blue = w > 0 ? (uint8_t)255*(w/max_bias) : 0;
         SDL_SetRenderDrawColor(screen.renderer, red, 0, blue, 255);
-        draw_neuron(x0 + l_space * (n.num_layers - 1),
+        draw_neuron(x0,
                     y0 + n_space * j,
                     n_rad);
     }

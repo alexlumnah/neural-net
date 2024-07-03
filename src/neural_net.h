@@ -28,6 +28,7 @@ typedef struct NeuralNetwork {
 } NeuralNetwork;
 
 float calculate_cost(Matrix* exp_output, Matrix* act_output);
+void print_neural_network(NeuralNetwork n);
 
 NeuralNetwork create_neural_network(uint32_t num_inputs, uint32_t num_layers, const uint32_t* num_nodes); // Instantiate neural network, using random values for weights and biases
 void destroy_neural_network(NeuralNetwork n);   // Destroy neural network and all layers
