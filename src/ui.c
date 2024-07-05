@@ -40,12 +40,12 @@ void draw_neural_net(SDL_Rect r, NeuralNetwork n) {
     int n_rad = 15;
     int l_space = (r.w - 2 * n_rad) / (n.num_layers - 1);
     for (uint32_t i = n.num_layers; i > 1; i--) {
-        int n0_space = r.h / (n.layers[i].num_nodes + 1);
-        for (uint32_t j = 0; j < n.layers[i].num_nodes; j++) {
+        int n0_space = r.h / (n.layers[i].num_neurons + 1);
+        for (uint32_t j = 0; j < n.layers[i].num_neurons; j++) {
             int x0 = r.x + n_rad;
             int y0 = r.y + n_rad + n0_space/2;
-            for (uint32_t k = 0; k < n.layers[i-1].num_nodes; k++) {
-                int n1_space = r.h / (n.layers[i-1].num_nodes + 1);
+            for (uint32_t k = 0; k < n.layers[i-1].num_neurons; k++) {
+                int n1_space = r.h / (n.layers[i-1].num_neurons + 1);
                 int x1 = r.x + n_rad;
                 int y1 = r.y + n_rad + n1_space/2;
                 float w = n.layers[i].w->data[j * n.layers[i].w->cols + k];
@@ -69,8 +69,8 @@ void draw_neural_net(SDL_Rect r, NeuralNetwork n) {
     }
 
     // Draw first layer of neurons
-    for (uint32_t j = 0; j < n.layers[1].num_nodes; j++) {
-        int n_space = r.h / (n.layers[1].num_nodes + 1);
+    for (uint32_t j = 0; j < n.layers[1].num_neurons; j++) {
+        int n_space = r.h / (n.layers[1].num_neurons + 1);
         int x0 = r.x + n_rad;
         int y0 = r.y + n_rad + n_space/2;
         float w = n.layers[1].b->data[j];

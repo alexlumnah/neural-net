@@ -8,7 +8,14 @@ typedef enum ActFun {
     ACT_RELU,
     ACT_TANH,
     ACT_SOFTMAX,
-} ActType;
+} ActFun;
+
+static const char* ACT_STR[] = {
+    "ACT_SIGMOID",
+    "ACT_RELU",
+    "ACT_TANH",
+    "ACT_SOFT_MAX",
+};
 
 void act_sigmoid(Matrix* dst, Matrix* src);
 void act_sigmoid_prime(Matrix* dst, Matrix* src);

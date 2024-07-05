@@ -81,7 +81,7 @@ void evaluate_network(NeuralNetwork n, size_t test_size, Matrix** test_inputs, M
         forward_propogate(n, test_inputs[i], output);
         if (find_max(expected_outputs[i]) == find_max(output))
             *num_correct = (*num_correct) + 1;
-        *cost += calculate_cost(expected_outputs[i], output);
+        *cost += n.cost_fun(expected_outputs[i], output);
     }
     matrix_destroy(output);
 }
@@ -128,7 +128,7 @@ int main(void) {
         expected_test_outputs[i]->data[test_labels[i]] = 1.0;
     }
 
-/*
+    /*
    // Extend training set by manipulating training inputs
     Matrix** variable_images;
     uint8_t* variable_labels;
@@ -138,35 +138,31 @@ int main(void) {
     
     // Copy new images to end of training images list
     
-    training_images = realloc(training_images, sizeof(Matrix*) * num_images * 2);
-    expected_outputs = realloc(expected_outputs, sizeof(Matrix*) * num_images * 2);
-    for (size_t i = 0; i < num_images; i++) {
+    training_images = realloc(training_images, sizeof(Matrix*) * (num_images + num_variable_images));
+    expected_outputs = realloc(expected_outputs, sizeof(Matrix*) * (num_images + num_variable_images));
+    for (size_t i = 0; i < num_variable_images; i++) {
         training_images[num_images + i] = variable_images[i];
         expected_outputs[num_images + i] = expected_outputs[i];
     }
-    num_images *= 2;
-   */ 
+    num_images = num_images + num_variable_images;
+    */
 
     // Create neural network
-    uint32_t nodes[] = {16, 16, 16, 10};
+    uint32_t nodes[] = {100, 10};
     NeuralNetwork n = create_neural_network(784, count(nodes), nodes);
-    set_act_fun(n, 1, ACT_SIGMOID);
-    set_act_fun(n, 2, ACT_RELU);
-    set_act_fun(n, 3, ACT_TANH);
-    set_act_fun(n, count(nodes), ACT_SOFTMAX);
-
-    // Initialize screen
-    SDL_Rect net_box = RECT(800, 100, 600, 600);
-    init_screen();
-    clear_screen();
-    draw_neural_net(net_box, n);
-    display_screen();
-    handle_inputs();
+    set_cost_fun(&n, COST_CROSS_ENTROPY);
+    //set_act_fun(&n, 1, ACT_RELU);
+    //set_act_fun(&n, 3, ACT_RELU);
+    //set_act_fun(&n, 2, ACT_RELU);
+    //set_act_fun(&n, count(nodes), ACT_SOFTMAX);
 
     // Lets train our network
-    int num_epochs = 5;
-    int batch_size = 30;
-    float learning_rate = 0.2;
+    int num_epochs = 60;
+    int batch_size = 10;
+    float learning_rate = 0.1;
+    int draw_display = 0;
+    //set_drop_out(&n, 0.5f);
+    //set_l2_reg(&n, 5.0);
 
     // Print out hyper parameters
     printf("Training Neural Network\n");
@@ -184,12 +180,22 @@ int main(void) {
     evaluate_network(n, num_test_images, test_images, expected_test_outputs, &success, &cost);
     printf("Starting Benchmark - Number Right: %zu Success Rate: %f Cost: %f\n", success, (float)success/(float)num_test_images, cost);
 
+    // Initialize screen
+    SDL_Rect net_box = RECT(800, 100, 600, 600);
+    if (draw_display) {
+        init_screen();
+        clear_screen();
+        draw_neural_net(net_box, n);
+        display_screen();
+        handle_inputs();
+    }
+
     // Loop over each epoch
     for (int i = 0; i < num_epochs; i++) {
 
         // Train Network
         clock_t begin = clock();
-        stochastic_gradient_descent(n, num_images, training_images, expected_outputs, num_images/batch_size, learning_rate);
+        stochastic_gradient_descent(n, num_images, training_images, expected_outputs, batch_size, learning_rate);
 
         // Evaluate and print performance
         evaluate_network(n, num_test_images, test_images, expected_test_outputs, &success, &cost);
@@ -197,13 +203,16 @@ int main(void) {
         printf("Time elapsed: %f\n", (double)(clock() - begin) / (double) CLOCKS_PER_SEC);
 
         // Draw updated neural network
-        clear_screen();
-        draw_neural_net(RECT(800, 100, 600, 600), n);
-        display_screen();
-        handle_inputs();
+        if (draw_display) {
+            clear_screen();
+            draw_neural_net(RECT(800, 100, 600, 600), n);
+            display_screen();
+            handle_inputs();
+        }
     }
 
-    destroy_screen();
+    // Destroy screen
+    if (draw_display) destroy_screen();
 
     // Save my neural network
     // save_neural_network(n, "test_neural_network_varied.txt");
@@ -220,27 +229,29 @@ int main(void) {
     */
 
     // Create window where you can draw numbers and classify them
-    init_screen();
+    if (draw_display) {
+        init_screen();
 
-    Matrix* output = matrix_create(10, 1);
-    Matrix* input = matrix_create(784, 1);
-    uint8_t guess;
+        Matrix* output = matrix_create(10, 1);
+        Matrix* input = matrix_create(784, 1);
+        uint8_t guess;
 
-    add_button(RECT(200, 200, 100, 100), GREEN, print_guess, (void*)&guess);
-    add_button(RECT(200, 400, 100, 100), RED, clear_inputs, (void*)input);
-    add_image(400, 200, input, update_image, NULL);
+        add_button(RECT(200, 200, 100, 100), GREEN, print_guess, (void*)&guess);
+        add_button(RECT(200, 400, 100, 100), RED, clear_inputs, (void*)input);
+        add_image(400, 200, input, update_image, NULL);
 
-    while (handle_inputs()) {
-        clear_screen();
-        draw_neural_net(RECT(800, 100, 600, 600), n);
-        display_screen();
+        while (handle_inputs()) {
+            clear_screen();
+            draw_neural_net(RECT(800, 100, 600, 600), n);
+            display_screen();
 
-        // Guess input
-        forward_propogate(n, input, output);
-        guess = find_max(output);
+            // Guess input
+            forward_propogate(n, input, output);
+            guess = find_max(output);
+        }
+        
+        destroy_screen();
     }
-    
-    destroy_screen();
 
 
 }

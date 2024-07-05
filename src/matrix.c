@@ -132,15 +132,33 @@ void matrix_mmult(Matrix* m, Matrix* a, Matrix* b) {
 void matrix_cmult(Matrix* m, Matrix* a, bool a_t, Matrix* b, bool b_t, float alpha, float beta) {
 
     // Assert we have compatible dimensions, even if we are transposing matrices
-    assert(m->rows == (a_t ? a->cols : a->rows));
-    assert(m->cols == (b_t ? b->rows : b->cols));
-    assert((a_t ? a->rows : a->cols) == (b_t ? b->cols : b->rows));
+    uint32_t a_rows = (a_t ? a->cols : a->rows);
+    uint32_t a_cols = (a_t ? a->rows : a->cols);
+    uint32_t b_rows = (b_t ? b->cols : b->rows);
+    uint32_t b_cols = (b_t ? b->rows : b->cols);
+    assert(m->rows == a_rows);
+    assert(m->cols == b_cols);
+    assert(a_cols = b_rows);
 
     // Use cblas single precision generic matrix multiplication method
     // C = alpha * Op(A) * Op(B) + beta * C, where A = m x k, B = k x n, C = m x n matrix
     // Op(x) = x^T (X-transpose), if specified in argument
     // cblas_sgemm(CBLAS_ORDER, transpose_A, transpose_B, m, n, k, alpha, *A, a_width, *B, b_width, beta, *C, c_width)
-    cblas_sgemm(CblasRowMajor, a_t ? CblasTrans : CblasNoTrans, b_t ? CblasTrans : CblasNoTrans, m->rows, m->cols, a_t ? a->rows : a->cols, alpha, a->data, a->cols, b->data, b->cols, beta, m->data, m->cols);
+    cblas_sgemm(CblasRowMajor, a_t ? CblasTrans : CblasNoTrans, b_t ? CblasTrans : CblasNoTrans, m->rows, m->cols, a_cols, alpha, a->data, a->cols, b->data, b->cols, beta, m->data, m->cols);
+}
+
+// Efficient multiplication of a diagonal matrix by a vector
+void matrix_dmult(Matrix* m, Matrix* d, Matrix* v) {
+
+    // Assert we have compatible dimensions
+    assert(d->rows == d->cols);
+    assert(d->cols == v->rows);
+    assert(m->rows == d->rows);
+    assert(m->cols == v->cols);
+    assert(v->cols == 1);
+
+    for (uint32_t i = 0; i < m->rows; i++)
+        m->data[i] = d->data[i*d->cols + i] * v->data[i];
 }
 
 // Hadamard Product m = (a_i * b_i for all elements i)
@@ -215,6 +233,17 @@ void matrix_initialize_random(Matrix* m) {
     }
 }
 
+// Initialize all elements to a small positive value
+void matrix_initialize_pos(Matrix* m) {
+
+    // Initialize all values to random float between 0 and 1
+    for (uint32_t row = 0; row < m->rows; row++) {
+        for (uint32_t col = 0; col < m->cols; col++) {
+            int rows = row * m->cols;
+            m->data[rows + col] = ((float)(rand()) / (float)(RAND_MAX));
+        }
+    }
+}
 // Set all elements to zero
 void matrix_zero(Matrix* m) {
     memset(m->data, 0, m->cols * m->rows * sizeof(m->data[0]));

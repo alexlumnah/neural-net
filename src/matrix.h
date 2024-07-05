@@ -22,11 +22,13 @@ void matrix_diff(Matrix* m, Matrix* a, Matrix* b);  // Compute Difference of Mat
 void matrix_smult(Matrix* m, Matrix* a, float c);   // Scalar multiply m = (c * a)
 void matrix_mmult(Matrix* m, Matrix* a, Matrix* b); // Matrix multiply m = (a * b)
 void matrix_cmult(Matrix* m, Matrix* a, bool a_t, Matrix* b, bool b_t, float alpha, float beta); // Complex multiplication m = alpha * A * B + beta * C, where A/B are optionally transposed
+void matrix_dmult(Matrix* m, Matrix* d, Matrix* b); // Matrix multiply m = D * B, where D is a diagonal matrix and B is optionally transposed
 void matrix_hprod(Matrix* m, Matrix* a, Matrix* b); // Hadamard Product m_i = (a_i * b_i for all elements i)
 void matrix_transpose(Matrix* m, Matrix* a);        // Transpose matrix
 void matrix_activation(Matrix* m, Matrix* a, float act(float));// Apply activation function to elements of matrix
 
 // Matrix Mutations
 void matrix_initialize_random(Matrix* m);               // Initialize all elements to random value
+void matrix_initialize_pos(Matrix* m);                  // Initialize all elements to a small positive random value
 void matrix_zero(Matrix* m);                            // Zero elements in matrix
 #endif // MATRIX_H

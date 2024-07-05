@@ -18,15 +18,10 @@ void act_sigmoid_prime(Matrix* a_j, Matrix* a) {
     assert(a->rows == a_j->rows);
     assert(a->rows == a_j->cols);
 
+    // All off diagonal entries are 0
     for (uint32_t i = 0; i < a_j->rows; i++) {
-        for (uint32_t j = 0; j < a_j->cols; j++) {
-            if (i != j) {
-                a_j->data[i * a_j->cols + j] = 0.0f;
-            } else {
-                float s = a->data[i];
-                a_j->data[i * a_j->cols + j] = s * (1 - s);
-            }
-        }
+        float s = a->data[i];
+        a_j->data[i * a_j->cols + i] = s * (1 - s);
     }
 }
 
@@ -35,22 +30,16 @@ void act_relu(Matrix* a, Matrix* z) {
     assert(z->cols == a->cols);
 
     for (uint32_t i = 0; i < z->rows * z->cols; i++)
-        a->data[i] = z->data[i] < 0.0f ? 0.0f : z->data[i];
+        a->data[i] = z->data[i] <= 0.0f ? 0.0f : z->data[i];
 }
 
 void act_relu_prime(Matrix* a_j, Matrix* a) {
     assert(a->rows == a_j->rows);
     assert(a->rows == a_j->cols);
 
+    // All of diagonal entries are 0
     for (uint32_t i = 0; i < a_j->rows; i++) {
-        for (uint32_t j = 0; j < a_j->cols; j++) {
-            if (i != j) {
-                a_j->data[i * a_j->cols + j] = 0.0f;
-            }
-            else {
-                a_j->data[i * a_j->cols + j] = a->data[i] < 0.0f ? 0.0f : 1.0f;
-            }
-        }
+        a_j->data[i * a_j->cols + i] = a->data[i] <= 0.0f ? 0.0f : 1.0f;
     }
 }
 
@@ -66,16 +55,10 @@ void act_tanh_prime(Matrix* a_j, Matrix* a) {
     assert(a->rows == a_j->rows);
     assert(a->rows == a_j->cols);
 
+    // All of diagonal entries are 0
     for (uint32_t i = 0; i < a_j->rows; i++) {
-        for (uint32_t j = 0; j < a_j->cols; j++) {
-            if (i != j) {
-                a_j->data[i * a_j->cols + j] = 0.0f;
-            }
-            else {
-                float t = a->data[i];
-                a_j->data[i * a_j->cols + j] = 1.0f - (t * t);
-            }
-        }
+        float t = a->data[i];
+        a_j->data[i * a_j->cols + i] = 1.0f - (t * t);
     }
 }
 
@@ -93,6 +76,7 @@ void act_softmax(Matrix* a, Matrix* z) {
     for (uint32_t i = 0; i < z->rows * z->cols; i++)
         sum += exp(z->data[i] - max);
 
+    // Calculate activations
     for (uint32_t i = 0; i < z->rows * z->cols; i++)
         a->data[i] = exp(z->data[i] - max) / sum;
 }
