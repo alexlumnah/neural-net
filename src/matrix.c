@@ -213,12 +213,12 @@ void matrix_activation(Matrix* m, Matrix* a, float act(float)) {
 }
 
 // Generate random number with guassian distribution using Box_Muller method
-float random_guassian(void) {
+float random_gaussian(float mean, float stdev) {
 
     float u = (float)rand() / (float)RAND_MAX;
     float v = (float)rand() / (float)RAND_MAX;
 
-    return sqrt(-2 * log(u)) * cos(2 * M_PI * v);
+    return stdev * sqrtf(-2 * logf(u)) * cosf(2 * M_PI * v) + mean;
 }
 
 // Initialize all elements to random value
@@ -233,14 +233,13 @@ void matrix_initialize_random(Matrix* m) {
     }
 }
 
-// Initialize all elements to a small positive value
-void matrix_initialize_pos(Matrix* m) {
+void matrix_initialize_gaussian(Matrix* m, float mean, float stdev) {
 
-    // Initialize all values to random float between 0 and 1
+    // Initialize all values to random float between -1 and 1
     for (uint32_t row = 0; row < m->rows; row++) {
         for (uint32_t col = 0; col < m->cols; col++) {
             int rows = row * m->cols;
-            m->data[rows + col] = ((float)(rand()) / (float)(RAND_MAX));
+            m->data[rows + col] = random_gaussian(mean, stdev);
         }
     }
 }

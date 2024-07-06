@@ -15,6 +15,7 @@
    x Different cost functions
    x Make multiplication more efficient for diagonal matrices
    - Option for different drop-out rates per layer
+   - Momentum-based gradient descent
    - Update save/load functionality
    - Model validation checks - e.g. need layer with output between 0 and 1 for cross entropy
 
@@ -85,8 +86,12 @@ NeuralNetwork create_neural_network(uint32_t num_inputs, uint32_t num_layers, co
         if (i != n.num_layers) {
             n.layers[i].s = matrix_create(nodes, num_neurons[i]);
         }
-        matrix_initialize_random(n.layers[i].w);
-        matrix_initialize_random(n.layers[i].b);
+        
+        // Initialize weights as random guassian variables
+        float mean = 0.0f;
+        float stdev = 1.0f / sqrtf(n.layers[i-1].num_neurons);
+        matrix_initialize_gaussian(n.layers[i].w, mean, stdev);
+        matrix_initialize_gaussian(n.layers[i].b, 0.0, 1.0);
         set_act_fun(&n, i, ACT_SIGMOID);
     }
 

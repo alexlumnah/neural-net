@@ -29,6 +29,6 @@ void matrix_activation(Matrix* m, Matrix* a, float act(float));// Apply activati
 
 // Matrix Mutations
 void matrix_initialize_random(Matrix* m);               // Initialize all elements to random value
-void matrix_initialize_pos(Matrix* m);                  // Initialize all elements to a small positive random value
+void matrix_initialize_gaussian(Matrix* m, float mean, float stdev); // Initialize all elements to random gaussian value
 void matrix_zero(Matrix* m);                            // Zero elements in matrix
 #endif // MATRIX_H

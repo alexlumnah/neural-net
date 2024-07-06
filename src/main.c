@@ -148,7 +148,7 @@ int main(void) {
     */
 
     // Create neural network
-    uint32_t nodes[] = {100, 10};
+    uint32_t nodes[] = {30, 30, 30, 30, 10};
     NeuralNetwork n = create_neural_network(784, count(nodes), nodes);
     set_cost_fun(&n, COST_CROSS_ENTROPY);
     //set_act_fun(&n, 1, ACT_RELU);
@@ -157,12 +157,12 @@ int main(void) {
     //set_act_fun(&n, count(nodes), ACT_SOFTMAX);
 
     // Lets train our network
-    int num_epochs = 60;
+    int num_epochs = 30;
     int batch_size = 10;
     float learning_rate = 0.1;
     int draw_display = 0;
     //set_drop_out(&n, 0.5f);
-    //set_l2_reg(&n, 5.0);
+    set_l2_reg(&n, 5.0);
 
     // Print out hyper parameters
     printf("Training Neural Network\n");
