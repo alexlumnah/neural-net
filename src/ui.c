@@ -16,7 +16,7 @@ void draw_neuron(int x, int y, int rad) {
         }
     }
 }
-
+/*
 void draw_neural_net(SDL_Rect r, NeuralNetwork n) {
 
     // Preprocess neural network for plotting purposes
@@ -24,8 +24,8 @@ void draw_neural_net(SDL_Rect r, NeuralNetwork n) {
     float min_weight = 0;
     float max_bias = 0;
     float min_bias = 0;
-    for (uint32_t i = 1; i <= n.num_layers; i++) {
-        Layer l = n.layers[i];
+    for (uint32_t i = 1; i <= n.layer_count; i++) {
+        Layer l = *n.layers[i];
         for (uint32_t j = 0; j < l.w->rows * l.w->cols; j++) {
             if (l.w->data[j] > max_weight) max_weight = l.w->data[j];
             if (l.w->data[j] < min_weight) min_weight = l.w->data[j];
@@ -38,8 +38,8 @@ void draw_neural_net(SDL_Rect r, NeuralNetwork n) {
 
     // Draw neurons
     int n_rad = 15;
-    int l_space = (r.w - 2 * n_rad) / (n.num_layers - 1);
-    for (uint32_t i = n.num_layers; i > 1; i--) {
+    int l_space = (r.w - 2 * n_rad) / (n.layer_count - 1);
+    for (uint32_t i = n.layer_count; i > 1; i--) {
         int n0_space = r.h / (n.layers[i].num_neurons + 1);
         for (uint32_t j = 0; j < n.layers[i].num_neurons; j++) {
             int x0 = r.x + n_rad;
@@ -86,6 +86,7 @@ void draw_neural_net(SDL_Rect r, NeuralNetwork n) {
     SDL_RenderDrawRect(screen.renderer, &r);
         
 }
+*/
 
 void draw_cost_plot(SDL_Rect r, Matrix* cost) {
     (void) r;
@@ -255,3 +256,4 @@ void display_screen(void) {
 void destroy_screen(void) {
     SDL_DestroyWindow(screen.window);
 }
+

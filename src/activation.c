@@ -15,13 +15,13 @@ void act_sigmoid(Matrix* a, Matrix* z) {
 
 // Compute sigmoid derivative of src, store in dst
 void act_sigmoid_prime(Matrix* a_j, Matrix* a) {
-    assert(a->rows == a_j->rows);
-    assert(a->rows == a_j->cols);
+    assert(a_j->rows = a->rows);
+    assert(a_j->cols == 1);
 
     // All off diagonal entries are 0
     for (uint32_t i = 0; i < a_j->rows; i++) {
         float s = a->data[i];
-        a_j->data[i * a_j->cols + i] = s * (1 - s);
+        a_j->data[i] = s * (1 - s);
     }
 }
 
@@ -34,12 +34,12 @@ void act_relu(Matrix* a, Matrix* z) {
 }
 
 void act_relu_prime(Matrix* a_j, Matrix* a) {
-    assert(a->rows == a_j->rows);
-    assert(a->rows == a_j->cols);
+    assert(a_j->rows = a->rows);
+    assert(a_j->cols == 1);
 
     // All of diagonal entries are 0
     for (uint32_t i = 0; i < a_j->rows; i++) {
-        a_j->data[i * a_j->cols + i] = a->data[i] <= 0.0f ? 0.0f : 1.0f;
+        a_j->data[i] = a->data[i] <= 0.0f ? 0.0f : 1.0f;
     }
 }
 
@@ -52,13 +52,13 @@ void act_tanh(Matrix* a, Matrix* z) {
 }
 
 void act_tanh_prime(Matrix* a_j, Matrix* a) {
-    assert(a->rows == a_j->rows);
-    assert(a->rows == a_j->cols);
+    assert(a_j->rows = a->rows);
+    assert(a_j->cols == 1);
 
     // All of diagonal entries are 0
     for (uint32_t i = 0; i < a_j->rows; i++) {
         float t = a->data[i];
-        a_j->data[i * a_j->cols + i] = 1.0f - (t * t);
+        a_j->data[i] = 1.0f - (t * t);
     }
 }
 

@@ -128,7 +128,7 @@ int main(void) {
         expected_test_outputs[i]->data[test_labels[i]] = 1.0;
     }
 
-    /*
+    
    // Extend training set by manipulating training inputs
     Matrix** variable_images;
     uint8_t* variable_labels;
@@ -145,24 +145,22 @@ int main(void) {
         expected_outputs[num_images + i] = expected_outputs[i];
     }
     num_images = num_images + num_variable_images;
-    */
+   
 
     // Create neural network
-    uint32_t nodes[] = {30, 30, 30, 30, 10};
-    NeuralNetwork n = create_neural_network(784, count(nodes), nodes);
-    set_cost_fun(&n, COST_CROSS_ENTROPY);
-    //set_act_fun(&n, 1, ACT_RELU);
-    //set_act_fun(&n, 3, ACT_RELU);
-    //set_act_fun(&n, 2, ACT_RELU);
-    //set_act_fun(&n, count(nodes), ACT_SOFTMAX);
+    NeuralNetwork n = create_neural_network(28, 28, COST_CROSS_ENTROPY);
+    convolutional_layer(&n, ACT_RELU, 5, 5, 5);
+    set_l2_reg(&n, 1, 0.1);
+    //pooling_layer(&n, 2, 2, POOL_MAX);
+    //fully_connected_layer(&n, ACT_RELU, 60, 1);
+    fully_connected_layer(&n, ACT_SIGMOID, 10, 1);
+    set_l2_reg(&n, 2, 0.1);
 
     // Lets train our network
-    int num_epochs = 30;
+    int num_epochs = 12;
     int batch_size = 10;
-    float learning_rate = 0.1;
-    int draw_display = 0;
-    //set_drop_out(&n, 0.5f);
-    set_l2_reg(&n, 5.0);
+    float learning_rate = 0.01;
+    int draw_display = 1;
 
     // Print out hyper parameters
     printf("Training Neural Network\n");
@@ -180,6 +178,7 @@ int main(void) {
     evaluate_network(n, num_test_images, test_images, expected_test_outputs, &success, &cost);
     printf("Starting Benchmark - Number Right: %zu Success Rate: %f Cost: %f\n", success, (float)success/(float)num_test_images, cost);
 
+    /*
     // Initialize screen
     SDL_Rect net_box = RECT(800, 100, 600, 600);
     if (draw_display) {
@@ -189,6 +188,7 @@ int main(void) {
         display_screen();
         handle_inputs();
     }
+    */
 
     // Loop over each epoch
     for (int i = 0; i < num_epochs; i++) {
@@ -196,23 +196,29 @@ int main(void) {
         // Train Network
         clock_t begin = clock();
         stochastic_gradient_descent(n, num_images, training_images, expected_outputs, batch_size, learning_rate);
-
+        
+        matrix_print(CONV(n.layers[1])->map_w[0]);
+        matrix_print(CONV(n.layers[1])->map_wg[0]);
+        matrix_print(CONV(n.layers[1])->map_b);
+        matrix_print(CONV(n.layers[1])->map_bg);
         // Evaluate and print performance
         evaluate_network(n, num_test_images, test_images, expected_test_outputs, &success, &cost);
         printf("Training Round %d Number Right: %zu Success Rate: %f Cost: %f\n", i, success, (float)success/(float)num_test_images, cost);
         printf("Time elapsed: %f\n", (double)(clock() - begin) / (double) CLOCKS_PER_SEC);
 
         // Draw updated neural network
+        /*
         if (draw_display) {
             clear_screen();
             draw_neural_net(RECT(800, 100, 600, 600), n);
             display_screen();
             handle_inputs();
         }
+        */
     }
 
     // Destroy screen
-    if (draw_display) destroy_screen();
+    //if (draw_display) destroy_screen();
 
     // Save my neural network
     // save_neural_network(n, "test_neural_network_varied.txt");
@@ -242,7 +248,7 @@ int main(void) {
 
         while (handle_inputs()) {
             clear_screen();
-            draw_neural_net(RECT(800, 100, 600, 600), n);
+            //draw_neural_net(RECT(800, 100, 600, 600), n);
             display_screen();
 
             // Guess input
