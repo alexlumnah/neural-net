@@ -57,13 +57,13 @@ void update_image(int x, int y, Image* img) {
 }
 
 // Find max element in a column matrix
-int find_max(Matrix* m) {
+int find_max(Matrix m) {
     
-    float max = m->data[0];
+    float max = m.data[0];
     int loc = 0;
-    for (uint32_t i = 1; i < m->rows; i++) {
-        if (m->data[i] > max) {
-            max = m->data[i];
+    for (uint32_t i = 1; i < m.rows; i++) {
+        if (m.data[i] > max) {
+            max = m.data[i];
             loc = i;
         }
     }
@@ -71,19 +71,19 @@ int find_max(Matrix* m) {
 }
 
 // Evaluate network
-void evaluate_network(NeuralNetwork n, size_t test_size, Matrix** test_inputs, Matrix** expected_outputs, size_t* num_correct, float* cost) {
+void evaluate_network(NeuralNetwork n, size_t test_size, Matrix* test_inputs, Matrix* expected_outputs, size_t* num_correct, float* cost) {
 
     *num_correct = 0;
     *cost = 0;
     // Now evaluate every single input, test the output
-    Matrix* output = matrix_create(expected_outputs[0]->rows, expected_outputs[0]->cols);
+    Matrix output = matrix_create(expected_outputs[0].rows, expected_outputs[0].cols);
     for (size_t i = 0; i < test_size; i++) {
         forward_propogate(n, test_inputs[i], output);
         if (find_max(expected_outputs[i]) == find_max(output))
             *num_correct = (*num_correct) + 1;
         *cost += n.cost_fun(expected_outputs[i], output);
     }
-    matrix_destroy(output);
+    matrix_destroy(&output);
 }
 
 int main(void) {
@@ -92,7 +92,7 @@ int main(void) {
 
     // Load training images
     size_t num_images;
-    Matrix** training_images;
+    Matrix* training_images;
     num_images = load_images("/Users/lumnah/space/c/neural-net/mnist-data/train-images-idx3-ubyte", &training_images);
 
     size_t num_labels;
@@ -102,19 +102,19 @@ int main(void) {
     // Split out a validation set
     size_t num_val_images = 10000;
     num_images = num_images - num_val_images;
-    //Matrix** val_images = &training_images[num_images];
+    //Matrix* val_images = &training_images[num_images];
     //uint8_t* val_labels = &training_labels[num_images];
 
     // Generate matrix of expected outputs
-    Matrix** expected_outputs = calloc(sizeof(Matrix*), num_labels);
+    Matrix* expected_outputs = calloc(sizeof(Matrix), num_labels);
     for (size_t i = 0; i < num_labels; i++) {
         expected_outputs[i] = matrix_create(10, 1);
-        expected_outputs[i]->data[training_labels[i]] = 1.0;
+        expected_outputs[i].data[training_labels[i]] = 1.0;
     }
 
     // Load test set
     size_t num_test_images;
-    Matrix** test_images;
+    Matrix* test_images;
     num_test_images = load_images("/Users/lumnah/space/c/neural-net/mnist-data/t10k-images-idx3-ubyte", &test_images);
 
     size_t num_test_labels;
@@ -122,44 +122,44 @@ int main(void) {
     num_test_labels = load_labels("/Users/lumnah/space/c/neural-net/mnist-data/t10k-labels-idx1-ubyte", &test_labels);
 
     // Generate matrix of expected outputs
-    Matrix** expected_test_outputs = calloc(sizeof(Matrix*), num_test_labels);
+    Matrix* expected_test_outputs = calloc(sizeof(Matrix), num_test_labels);
     for (size_t i = 0; i < num_test_labels; i++) {
         expected_test_outputs[i] = matrix_create(10, 1);
-        expected_test_outputs[i]->data[test_labels[i]] = 1.0;
+        expected_test_outputs[i].data[test_labels[i]] = 1.0;
     }
 
-    
-   // Extend training set by manipulating training inputs
-    Matrix** variable_images;
+    /*
+    // Extend training set by manipulating training inputs
+    Matrix* variable_images;
     uint8_t* variable_labels;
     size_t num_variable_images;
     printf("Extending MNIST Set...\n");
     num_variable_images = extend_set(training_images, training_labels, num_images, &variable_images, &variable_labels);
     
     // Copy new images to end of training images list
-    
-    training_images = realloc(training_images, sizeof(Matrix*) * (num_images + num_variable_images));
-    expected_outputs = realloc(expected_outputs, sizeof(Matrix*) * (num_images + num_variable_images));
+    training_images = realloc(training_images, sizeof(Matrix) * (num_images + num_variable_images));
+    expected_outputs = realloc(expected_outputs, sizeof(Matrix) * (num_images + num_variable_images));
     for (size_t i = 0; i < num_variable_images; i++) {
         training_images[num_images + i] = variable_images[i];
         expected_outputs[num_images + i] = expected_outputs[i];
     }
     num_images = num_images + num_variable_images;
-   
+    */
 
     // Create neural network
     NeuralNetwork n = create_neural_network(28, 28, COST_CROSS_ENTROPY);
-    convolutional_layer(&n, ACT_RELU, 5, 5, 5);
-    set_l2_reg(&n, 1, 0.1);
+    //convolutional_layer(&n, ACT_RELU, 5, 5, 5);
+    //set_l2_reg(&n, 1, 0.1);
     //pooling_layer(&n, 2, 2, POOL_MAX);
     //fully_connected_layer(&n, ACT_RELU, 60, 1);
+    fully_connected_layer(&n, ACT_SIGMOID, 60, 1);
     fully_connected_layer(&n, ACT_SIGMOID, 10, 1);
     set_l2_reg(&n, 2, 0.1);
 
     // Lets train our network
-    int num_epochs = 12;
+    int num_epochs = 30;
     int batch_size = 10;
-    float learning_rate = 0.01;
+    float learning_rate = 0.5;
     int draw_display = 1;
 
     // Print out hyper parameters
@@ -197,10 +197,10 @@ int main(void) {
         clock_t begin = clock();
         stochastic_gradient_descent(n, num_images, training_images, expected_outputs, batch_size, learning_rate);
         
-        matrix_print(CONV(n.layers[1])->map_w[0]);
-        matrix_print(CONV(n.layers[1])->map_wg[0]);
-        matrix_print(CONV(n.layers[1])->map_b);
-        matrix_print(CONV(n.layers[1])->map_bg);
+        //matrix_print(CONV(n.layers[1]).map_w[0]);
+        //matrix_print(CONV(n.layers[1]).map_wg[0]);
+        //matrix_print(CONV(n.layers[1]).map_b);
+        //matrix_print(CONV(n.layers[1]).map_bg);
         // Evaluate and print performance
         evaluate_network(n, num_test_images, test_images, expected_test_outputs, &success, &cost);
         printf("Training Round %d Number Right: %zu Success Rate: %f Cost: %f\n", i, success, (float)success/(float)num_test_images, cost);
@@ -238,13 +238,13 @@ int main(void) {
     if (draw_display) {
         init_screen();
 
-        Matrix* output = matrix_create(10, 1);
-        Matrix* input = matrix_create(784, 1);
+        Matrix output = matrix_create(10, 1);
+        Matrix input = matrix_create(784, 1);
         uint8_t guess;
 
         add_button(RECT(200, 200, 100, 100), GREEN, print_guess, (void*)&guess);
-        add_button(RECT(200, 400, 100, 100), RED, clear_inputs, (void*)input);
-        add_image(400, 200, input, update_image, NULL);
+        add_button(RECT(200, 400, 100, 100), RED, clear_inputs, (void*)&input);
+        add_image(400, 200, &input, update_image, NULL);
 
         while (handle_inputs()) {
             clear_screen();

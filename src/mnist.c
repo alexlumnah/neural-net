@@ -8,7 +8,7 @@
 #define ROWS (28)
 #define COLS (28)
 
-size_t load_images(const char* path, Matrix*** images) {
+size_t load_images(const char* path, Matrix** images) {
 
     FILE* f = fopen(path, "rb");
 
@@ -32,7 +32,7 @@ size_t load_images(const char* path, Matrix*** images) {
     num_cols = htonl(num_cols);
 
     // Allocate an array of images
-    *images = calloc(num_images, sizeof(Matrix*));
+    *images = calloc(num_images, sizeof(Matrix));
 
     // Read each image in the data set
     for (int n = 0; n < num_images; n++) {
@@ -41,7 +41,7 @@ size_t load_images(const char* path, Matrix*** images) {
             for (int i = 0; i < num_cols; i++) {
                 uint8_t pixel;
                 fread(&pixel, sizeof(pixel), 1, f);
-                (*images)[n]->data[j * num_cols + i] = (float)pixel / 255.0;
+                (*images)[n].data[j * num_cols + i] = (float)pixel / 255.0;
             }
         }
     }
@@ -84,7 +84,7 @@ size_t load_labels(const char* path, uint8_t** labels) {
 }
 
 // Rotate an mnist digit
-void rotate_image(Matrix* dst, Matrix* img, float deg) {
+void rotate_image(Matrix dst, Matrix img, float deg) {
 
     // Basic algorithm - loop through each value in destination table
     // Apply a reverse rotation to find the value in the original image to sample
@@ -116,25 +116,25 @@ void rotate_image(Matrix* dst, Matrix* img, float deg) {
             float j_p = j_rot - floor(j_rot);
 
             // Average all values into one
-            dst->data[i * COLS + j] = 0;
+            dst.data[i * COLS + j] = 0;
             if (i_f >= 0 && i_f < ROWS && j_f >= 0 && j_f < COLS)
-                r[i * COLS + j] += (1.0 - i_p) * (1.0 - j_p)* img->data[i_f * COLS + j_f];
+                r[i * COLS + j] += (1.0 - i_p) * (1.0 - j_p)* img.data[i_f * COLS + j_f];
             if (i_f >= 0 && i_f < ROWS && j_c >= 0 && j_c < COLS)
-                r[i * COLS + j] += (1.0 - i_p) * j_p * img->data[i_f * COLS + j_c];
+                r[i * COLS + j] += (1.0 - i_p) * j_p * img.data[i_f * COLS + j_c];
             if (i_c >= 0 && i_c < ROWS && j_f >= 0 && j_f < COLS)
-                r[i * COLS + j] += i_p * (1.0 - j_p) * img->data[i_c * COLS + j_f];
+                r[i * COLS + j] += i_p * (1.0 - j_p) * img.data[i_c * COLS + j_f];
             if (i_c >= 0 && i_c < ROWS && j_c >= 0 && j_c < COLS)
-                r[i * COLS + j] +=  i_p * j_p * img->data[i_c * COLS + j_c];
+                r[i * COLS + j] +=  i_p * j_p * img.data[i_c * COLS + j_c];
         }
     }
 
     // Now copy the results to the destination
     for (uint32_t n = 0; n < ROWS * COLS; n++) {
-        dst->data[n] = r[n];
+        dst.data[n] = r[n];
     }
 }
 
-void rescale_image(Matrix* dst, Matrix* img, float mag) {
+void rescale_image(Matrix dst, Matrix img, float mag) {
 
     // Basic algorithm - for each value in destination table
     // Translate so origin is in center, then scale the coordinates based 
@@ -160,26 +160,26 @@ void rescale_image(Matrix* dst, Matrix* img, float mag) {
             float j_p = j_sc - floor(j_sc);
 
             // Average all values into one
-            dst->data[i * COLS + j] = 0;
+            dst.data[i * COLS + j] = 0;
             if (i_f >= 0 && i_f < ROWS && j_f >= 0 && j_f < COLS)
-                s[i * COLS + j] += (1.0 - i_p) * (1.0 - j_p)* img->data[i_f * COLS + j_f];
+                s[i * COLS + j] += (1.0 - i_p) * (1.0 - j_p)* img.data[i_f * COLS + j_f];
             if (i_f >= 0 && i_f < ROWS && j_c >= 0 && j_c < COLS)
-                s[i * COLS + j] += (1.0 - i_p) * j_p * img->data[i_f * COLS + j_c];
+                s[i * COLS + j] += (1.0 - i_p) * j_p * img.data[i_f * COLS + j_c];
             if (i_c >= 0 && i_c < ROWS && j_f >= 0 && j_f < COLS)
-                s[i * COLS + j] += i_p * (1.0 - j_p) * img->data[i_c * COLS + j_f];
+                s[i * COLS + j] += i_p * (1.0 - j_p) * img.data[i_c * COLS + j_f];
             if (i_c >= 0 && i_c < ROWS && j_c >= 0 && j_c < COLS)
-                s[i * COLS + j] +=  i_p * j_p * img->data[i_c * COLS + j_c];
+                s[i * COLS + j] +=  i_p * j_p * img.data[i_c * COLS + j_c];
         }
     }
 
     // Now copy the results to the destination
     for (uint32_t n = 0; n < ROWS * COLS; n++) {
-        dst->data[n] = s[n];
+        dst.data[n] = s[n];
     }
 }
 
 
-void translate_image(Matrix* dst, Matrix* img, int dx, int dy) {
+void translate_image(Matrix dst, Matrix img, int dx, int dy) {
 
     // First find the min and max row and cols that have data
     // So we can clamp the translation
@@ -190,7 +190,7 @@ void translate_image(Matrix* dst, Matrix* img, int dx, int dy) {
     for (uint32_t i = 0; i < ROWS; i++) {
         for (uint32_t j = 0; j < COLS; j++) {
 
-            if (fabs(img->data[i * COLS + j]) < 0.0001f)
+            if (fabs(img.data[i * COLS + j]) < 0.0001f)
                 continue;
             
             if (i < min_row)
@@ -225,26 +225,26 @@ void translate_image(Matrix* dst, Matrix* img, int dx, int dy) {
     for (uint32_t i = 0; i < ROWS; i++) {
         for (uint32_t j = 0; j < COLS; j++) {
             if ( i - dy >= 0 && i - dy < ROWS && j - dx >= 0 && j - dx < COLS)
-                t[i * COLS + j] = img->data[(i - dy) * COLS + j - dx];
+                t[i * COLS + j] = img.data[(i - dy) * COLS + j - dx];
         }
     }
 
     // Now copy the results to the destination
     for (uint32_t n = 0; n < ROWS * COLS; n++) {
-        dst->data[n] = t[n];
+        dst.data[n] = t[n];
     }
 }
 
-size_t extend_set(Matrix** images, uint8_t* labels, size_t num_images, Matrix*** new_images, uint8_t** new_labels) {
+size_t extend_set(Matrix* images, uint8_t* labels, size_t num_images, Matrix** new_images, uint8_t** new_labels) {
 
     // Create list to store new images in
-    *new_images = calloc(sizeof(Matrix*), num_images);
+    *new_images = calloc(sizeof(Matrix), num_images);
     *new_labels = calloc(sizeof(uint8_t*), num_images);
 
     // Loop through all images and create a new image by 
     // rotating, scaling, and translating the original
     for (size_t i = 0; i < num_images; i++) {
-        (*new_images)[i] = matrix_create(images[i]->rows, images[i]->cols);
+        (*new_images)[i] = matrix_create(images[i].rows, images[i].cols);
         (*new_labels)[i] = labels[i];
 
         // Now rotate, scale, and translate image

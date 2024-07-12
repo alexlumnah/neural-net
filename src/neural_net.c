@@ -237,8 +237,8 @@ void convolutional_layer(NeuralNetwork* n, ActFun type, uint32_t num_maps, uint3
 
     // Create feature maps
     CONV(layer)->num_maps = num_maps;
-    CONV(layer)->map_w = calloc(sizeof(Matrix*), num_maps);
-    CONV(layer)->map_wg = calloc(sizeof(Matrix*), num_maps);
+    CONV(layer)->map_w = calloc(sizeof(Matrix), num_maps);
+    CONV(layer)->map_wg = calloc(sizeof(Matrix), num_maps);
     for (uint32_t i = 0; i < num_maps; i++) {
         // Create weight matrices
         CONV(layer)->map_w[i] = matrix_create(field_rows, field_cols);
@@ -255,11 +255,11 @@ void convolutional_layer(NeuralNetwork* n, ActFun type, uint32_t num_maps, uint3
 
 }
 // Shuffle two input arrays identically
-static void shuffle_arrays(size_t array_size, Matrix** array1, Matrix** array2) {
+static void shuffle_arrays(size_t array_size, Matrix* array1, Matrix* array2) {
 
     int rand_loc;
-    Matrix* m1;
-    Matrix* m2;
+    Matrix m1;
+    Matrix m2;
     for (uint32_t i = 0; i < array_size; i++) {
         m1 = array1[i];
         m2 = array2[i];
@@ -297,7 +297,7 @@ void init_drop_masks(NeuralNetwork n) {
         matrix_zero(n.layers[l].a_m);
         uint32_t count = n.layers[l].size * (1.0f - n.drop_rate);
         for (uint32_t i = 0; i < count; i++) {
-            n.layers[l].a_m->data[i] = 1.0f;
+            n.layers[l].a_m.data[i] = 1.0f;
         }
     }
 }
@@ -308,10 +308,10 @@ void update_drop_masks(NeuralNetwork n) {
     for (uint32_t l = 1; l < n.layer_count; l++) {
         // Shuffle existing mask to create a new one
         for (uint32_t i = 0; i < n.layers[l].size; i++) {
-            float a_m = n.layers[l].a_m->data[i];
+            float a_m = n.layers[l].a_m.data[i];
             int rand_loc = rand() % n.layers[l].size;
-            n.layers[l].a_m->data[i] = n.layers[l].a_m->data[rand_loc];
-            n.layers[l].a_m->data[rand_loc] = a_m;
+            n.layers[l].a_m.data[i] = n.layers[l].a_m.data[rand_loc];
+            n.layers[l].a_m.data[rand_loc] = a_m;
         }
     }
 
@@ -321,9 +321,9 @@ void update_drop_masks(NeuralNetwork n) {
 void scale_weights_up(NeuralNetwork n) {
 
     for (uint32_t l = 1; l < n.layer_count; l++) {
-        int w_size = n.layers[l].w->rows * n.layers[l].w->cols;
+        int w_size = n.layers[l].w.rows * n.layers[l].w.cols;
         for (int i = 0; i < w_size; i++) {
-            n.layers[l].w->data[i] = n.layers[l].w->data[i] / n.drop_rate;
+            n.layers[l].w.data[i] = n.layers[l].w.data[i] / n.drop_rate;
         }
     }
 }
@@ -332,9 +332,9 @@ void scale_weights_up(NeuralNetwork n) {
 void scale_weights_down(NeuralNetwork n) {
 
     for (uint32_t l = 1; l < n.layer_count; l++) {
-        int w_size = n.layers[l].w->rows * n.layers[l].w->cols;
+        int w_size = n.layers[l].w.rows * n.layers[l].w.cols;
         for (int i = 0; i < w_size; i++) {
-            n.layers[l].w->data[i] = n.layers[l].w->data[i] * n.drop_rate;
+            n.layers[l].w.data[i] = n.layers[l].w.data[i] * n.drop_rate;
         }
     }
 }
@@ -348,10 +348,10 @@ static void propogate_conv(NeuralNetwork n, uint32_t l) {
     for (uint32_t f = 0; f < CONV(layer)->num_maps; f++) {
 
         uint32_t map_size = layer->rows * layer->cols;
-        float* z = layer->z->data + f * map_size;
-        Matrix* a = prev_layer->a;
-        Matrix* w = CONV(layer)->map_w[f];
-        float b = CONV(layer)->map_b->data[f];
+        float* z = layer->z.data + f * map_size;
+        Matrix a = prev_layer->a;
+        Matrix w = CONV(layer)->map_w[f];
+        float b = CONV(layer)->map_b.data[f];
 
         // Row/column of convolutional layer
         for (uint32_t r = 0; r < layer->rows; r++) {
@@ -359,11 +359,11 @@ static void propogate_conv(NeuralNetwork n, uint32_t l) {
             for (uint32_t c = 0; c < layer->cols; c++) {
                 z_r[c] = 0.0f;
                 // Row/column of receptive field
-                for (uint32_t p = 0; p < w->rows; p++) {
+                for (uint32_t p = 0; p < w.rows; p++) {
                     // Cache w and a rows for quicker lookup
-                    float* w_r = w->data + p * w->cols;
-                    float* a_r = a->data + (r + p) * prev_layer->cols;
-                    for (uint32_t q = 0; q < w->cols; q++) {
+                    float* w_r = w.data + p * w.cols;
+                    float* a_r = a.data + (r + p) * prev_layer->cols;
+                    for (uint32_t q = 0; q < w.cols; q++) {
                         z_r[c] += w_r[q] * a_r[c + q]; 
                         //printf("%d %d %d %d %f\n",r,c,q,p, z_r[c]);
                     }
@@ -376,15 +376,15 @@ static void propogate_conv(NeuralNetwork n, uint32_t l) {
 }
 
 // Evaluate inputs to neural network, store in output if provided
-void forward_propogate(NeuralNetwork n, Matrix* input, Matrix* output) {
+void forward_propogate(NeuralNetwork n, Matrix input, Matrix output) {
 
     // Assert input and output have expected dimensions
-    assert(input->rows == n.layers[0]->a->rows);
-    assert(input->cols == n.layers[0]->a->cols);
+    assert(input.rows == n.layers[0]->a.rows);
+    assert(input.cols == n.layers[0]->a.cols);
 
-    if (output != NULL) {
-        assert(output->rows == n.layers[n.layer_count-1]->size);
-        assert(output->cols == 1);
+    if (output.data != NULL) {
+        assert(output.rows == n.layers[n.layer_count-1]->size);
+        assert(output.cols == 1);
     }
 
     // Copy inputs into first layer
@@ -421,7 +421,7 @@ void forward_propogate(NeuralNetwork n, Matrix* input, Matrix* output) {
     }
 
     // If output matrix is provided, copy data to output
-    if (output != NULL) {
+    if (output.data != NULL) {
         matrix_copy(output, n.layers[n.layer_count-1]->a);
     }
 }
@@ -436,7 +436,7 @@ void compute_error(NeuralNetwork n, uint32_t l) {
 
     // Case: Final Layer
     if (l == n.layer_count - 1) {
-        if (layer->a_j->cols == 1)
+        if (layer->a_j.cols == 1)
             matrix_hprod(layer->e, layer->a_j, layer->c_g);
         else
             matrix_cmult(layer->e,
@@ -450,7 +450,7 @@ void compute_error(NeuralNetwork n, uint32_t l) {
     Layer* next_layer = n.layers[l + 1]; 
     switch (next_layer->type) {
         case LAYER_FULLY_CONNECTED:
-            if (layer->a_j->cols == 1) {
+            if (layer->a_j.cols == 1) {
                 matrix_cmult(layer->e, 
                              FULL(next_layer)->w, true,
                              next_layer->e, false,
@@ -490,14 +490,14 @@ void compute_gradient(NeuralNetwork n, uint32_t l) {
     case LAYER_CONVOLUTIONAL:
         for (uint32_t f = 0; f < CONV(layer)->num_maps; f++) {
             uint32_t map_size = layer->rows * layer->cols;
-            Matrix* w_g = CONV(layer)->map_wg[f];
-            float* e = layer->e->data + f * map_size;
-            float* a = prev_layer->a->data;
+            Matrix w_g = CONV(layer)->map_wg[f];
+            float* e = layer->e.data + f * map_size;
+            float* a = prev_layer->a.data;
             // Row/column of receptive field
-            for (uint32_t p = 0; p < w_g->rows; p++) {
+            for (uint32_t p = 0; p < w_g.rows; p++) {
                 // Cache rows for quicker operations
-                float* w_g_r = w_g->data + p * w_g->cols;
-                for (uint32_t q = 0; q < w_g->cols; q++) {
+                float* w_g_r = w_g.data + p * w_g.cols;
+                for (uint32_t q = 0; q < w_g.cols; q++) {
                     // Row/column of convolutional layer
                     for (uint32_t r = 0; r < layer->rows; r++) {
                         float* e_r = e + r * layer->rows;
@@ -510,7 +510,7 @@ void compute_gradient(NeuralNetwork n, uint32_t l) {
             }
 
             // Calculate b gradient
-            float* b_g = CONV(layer)->map_bg->data + f;
+            float* b_g = CONV(layer)->map_bg.data + f;
             for (uint32_t r = 0; r < layer->rows; r++) {
                 float* e_r = e + r * layer->rows;
                 for (uint32_t c = 0; c < layer->cols; c++) {
@@ -526,15 +526,15 @@ void compute_gradient(NeuralNetwork n, uint32_t l) {
 }
 
 // Apply Back propogation algorithm
-void back_propogate(NeuralNetwork n, Matrix* input, Matrix* exp_output) {
+void back_propogate(NeuralNetwork n, Matrix input, Matrix exp_output) {
 
     // Assert input and output have expected dimensions
-    assert(input->rows == n.layers[0]->a->rows);
-    assert(input->cols == n.layers[0]->a->cols);
-    assert(exp_output->rows == n.layers[n.layer_count-1]->size);
-    assert(exp_output->cols == 1);
+    assert(input.rows == n.layers[0]->a.rows);
+    assert(input.cols == n.layers[0]->a.cols);
+    assert(exp_output.rows == n.layers[n.layer_count-1]->size);
+    assert(exp_output.cols == 1);
 
-    forward_propogate(n, input, NULL);
+    forward_propogate(n, input, (Matrix){0});
 
     // Compute Cost Gradient
     uint32_t L = n.layer_count - 1;
@@ -549,7 +549,7 @@ void back_propogate(NeuralNetwork n, Matrix* input, Matrix* exp_output) {
 }
 
 // Use back-propogation to evaluate gradient, and adjust weights/biases
-void gradient_descent(NeuralNetwork n, size_t batch_size, size_t training_size, Matrix** training_inputs, Matrix** expected_outputs, float eta) {
+void gradient_descent(NeuralNetwork n, size_t batch_size, size_t training_size, Matrix* training_inputs, Matrix* expected_outputs, float eta) {
 
     (void)training_size; // Supress compiler warnings
 
@@ -590,11 +590,11 @@ void gradient_descent(NeuralNetwork n, size_t batch_size, size_t training_size, 
 
             // Apply l1 regularization, if applicable
             if (LAYER(layer)->l1_reg > 0.0f) {
-                for (uint32_t j = 0; j < layer->w->rows; j++) {
+                for (uint32_t j = 0; j < layer->w.rows; j++) {
                     float scale = eta * LAYER(layer)->l1_reg / (float)training_size;
-                    float w = layer->w->data[j];
+                    float w = layer->w.data[j];
                     float sgn = (w > 0) - (w < 0);
-                    layer->w->data[j] -= scale * sgn;
+                    layer->w.data[j] -= scale * sgn;
                 }
             }
 
@@ -613,11 +613,11 @@ void gradient_descent(NeuralNetwork n, size_t batch_size, size_t training_size, 
             for (uint32_t f = 0; f < layer->num_maps; f++) {
                 // Apply l1 regularization, if applicable
                 if (LAYER(layer)->l1_reg > 0.0f) {
-                    for (uint32_t j = 0; j < layer->map_w[f]->rows; j++) {
+                    for (uint32_t j = 0; j < layer->map_w[f].rows; j++) {
                         float scale = eta * LAYER(layer)->l1_reg / (float)training_size;
-                        float w = layer->map_w[f]->data[j];
+                        float w = layer->map_w[f].data[j];
                         float sgn = (w > 0) - (w < 0);
-                        layer->map_w[f]->data[j] -= scale * sgn;
+                        layer->map_w[f].data[j] -= scale * sgn;
                     }
                 }
 
@@ -639,11 +639,11 @@ void gradient_descent(NeuralNetwork n, size_t batch_size, size_t training_size, 
 }
 
 // Apply stochastic gradient descent algorithm
-void stochastic_gradient_descent(NeuralNetwork n, size_t training_size, Matrix** training_inputs, Matrix** training_outputs, size_t batch_size, float eta) {
+void stochastic_gradient_descent(NeuralNetwork n, size_t training_size, Matrix* training_inputs, Matrix* training_outputs, size_t batch_size, float eta) {
 
     // First get subsets of training data for training
-    Matrix** inputs = calloc(sizeof(Matrix*), training_size);
-    Matrix** outputs = calloc(sizeof(Matrix*), training_size);
+    Matrix* inputs = calloc(sizeof(Matrix), training_size);
+    Matrix* outputs = calloc(sizeof(Matrix), training_size);
 
     for (uint32_t i = 0; i < training_size; i++) {
         inputs[i] = training_inputs[i];
@@ -682,22 +682,22 @@ void stochastic_gradient_descent(NeuralNetwork n, size_t training_size, Matrix**
 
 }
 
-void write_matrix(FILE* f, Matrix* m) {
+void write_matrix(FILE* f, Matrix m) {
 
     // Write rows
-    uint32_t rows = htons(m->rows);
+    uint32_t rows = htons(m.rows);
     fwrite(&rows, sizeof(rows), 1, f);
 
     // Write cols
-    uint32_t cols = htons(m->cols);
+    uint32_t cols = htons(m.cols);
     fwrite(&cols, sizeof(cols), 1, f);
 
     // Write data
-    fwrite(m->data, sizeof(m->data[0]), m->rows * m->cols, f);
+    fwrite(m.data, sizeof(m.data[0]), m.rows * m.cols, f);
 }
 
 // Read matrix from file, and store in provided matrix
-int read_matrix(FILE* f, Matrix* m) {
+int read_matrix(FILE* f, Matrix m) {
 
     size_t bytes;
 
@@ -714,12 +714,12 @@ int read_matrix(FILE* f, Matrix* m) {
     if (bytes != 1) return -1;
 
     // Confirm matrix has proper dimensions
-    if (m->rows != rows || m->cols != cols) {
+    if (m.rows != rows || m.cols != cols) {
         return -1;
     }
 
     // Read data
-    bytes = fread(m->data, sizeof(m->data[0]), rows * cols, f);
+    bytes = fread(m.data, sizeof(m.data[0]), rows * cols, f);
     if (bytes != rows * cols) return -1;
 
     return 0;
