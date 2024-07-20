@@ -27,6 +27,7 @@ void destroy_neural_network(NeuralNetwork n);
 
 void fully_connected_layer(NeuralNetwork* n, ActFun type, uint32_t rows, uint32_t cols);
 void convolutional_layer(NeuralNetwork* n, ActFun type, uint32_t num_maps, uint32_t field_rows, uint32_t field_cols);
+void max_pooling_layer(NeuralNetwork* n, uint32_t field_rows, uint32_t field_cols, uint32_t stride);
 
 void forward_propogate(NeuralNetwork n, Matrix input, Matrix output);
 void back_propogate(NeuralNetwork n, Matrix exp_output, Matrix act_output);

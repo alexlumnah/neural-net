@@ -4,6 +4,7 @@
 #include "matrix.h"
 
 typedef enum ActFun {
+    ACT_NONE,
     ACT_SIGMOID,
     ACT_RELU,
     ACT_TANH,
@@ -11,11 +12,15 @@ typedef enum ActFun {
 } ActFun;
 
 static const char* ACT_STR[] = {
+    "ACT_NONE",
     "ACT_SIGMOID",
     "ACT_RELU",
     "ACT_TANH",
     "ACT_SOFT_MAX",
 };
+
+void act_none(Matrix dst, Matrix src);
+void act_none_prime(Matrix dst, Matrix src);
 
 void act_sigmoid(Matrix dst, Matrix src);
 void act_sigmoid_prime(Matrix dst, Matrix src);

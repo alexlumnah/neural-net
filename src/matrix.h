@@ -31,4 +31,5 @@ void matrix_activation(Matrix m, Matrix a, float act(float));// Apply activation
 void matrix_initialize_random(Matrix m);               // Initialize all elements to random value
 void matrix_initialize_gaussian(Matrix m, float mean, float stdev); // Initialize all elements to random gaussian value
 void matrix_zero(Matrix m);                            // Zero elements in matrix
+void matrix_ones(Matrix m);                            // Set all elements in a matrix to 1
 #endif // MATRIX_H

@@ -242,7 +242,14 @@ void matrix_initialize_gaussian(Matrix m, float mean, float stdev) {
         }
     }
 }
+
 // Set all elements to zero
 void matrix_zero(Matrix m) {
     memset(m.data, 0, m.cols * m.rows * sizeof(m.data[0]));
 }
+
+// Set all elements to one
+void matrix_ones(Matrix m) {
+    for (uint32_t i = 0; i < m.rows * m.cols; i++) m.data[i] = 1.0f;
+}
+

@@ -2,13 +2,39 @@
 #include <stdio.h>
 #include <time.h>
 #include <stdbool.h>
+#include <complex.h>
 
 #include "matrix.h"
 #include "neural_net.h"
 #include "mnist.h"
 #include "ui.h"
+#include "convolve.h"
 
 #define count(list) sizeof(list)/sizeof(list[0])
+
+int main2(void) {
+
+    // Lets test our convolution functions
+    float kernel[] = {0, 1, 2, 3, 4, 5, 6, 7, 8};
+    Matrix k = matrix_create(3, 3);
+    k.data = kernel;
+
+    Matrix b = matrix_create(10,10);
+    for (uint32_t i = 0; i < 100; i++) b.data[i] = i;
+
+    Matrix m = matrix_create(8,8);
+
+    matrix_print(k);
+    matrix_print(b);
+
+    matrix_fft_convolve(m, k, b);
+
+    matrix_print(m);
+
+    return 0;
+}
+
+
 
 void print_guess(Button* but) {
     printf("Is this your number? %d\n", (*(uint8_t*)but->state));
@@ -146,20 +172,25 @@ int main(void) {
     num_images = num_images + num_variable_images;
     */
 
+    int r = 10;
+    printf("Random seed: %d\n", r);
+    srand(r);
     // Create neural network
     NeuralNetwork n = create_neural_network(28, 28, COST_CROSS_ENTROPY);
-    //convolutional_layer(&n, ACT_RELU, 5, 5, 5);
+    convolutional_layer(&n, ACT_RELU, 1, 5, 5);
+    //convolutional_layer(&n, ACT_RELU, 1, 5, 5);
     //set_l2_reg(&n, 1, 0.1);
-    //pooling_layer(&n, 2, 2, POOL_MAX);
+    max_pooling_layer(&n, 1, 1, 1);
     //fully_connected_layer(&n, ACT_RELU, 60, 1);
-    fully_connected_layer(&n, ACT_SIGMOID, 60, 1);
+    //fully_connected_layer(&n, ACT_SIGMOID, 60, 1);
     fully_connected_layer(&n, ACT_SIGMOID, 10, 1);
-    set_l2_reg(&n, 2, 0.1);
+    //set_l2_reg(&n, 2, 0.1);
+    //matrix_print(FULL(n.layers[3])->w);
 
     // Lets train our network
     int num_epochs = 30;
     int batch_size = 10;
-    float learning_rate = 0.5;
+    float learning_rate = 0.01;
     int draw_display = 1;
 
     // Print out hyper parameters
@@ -259,5 +290,5 @@ int main(void) {
         destroy_screen();
     }
 
-
+    return 0;
 }
