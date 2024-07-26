@@ -170,11 +170,8 @@ void matrix_hprod(Matrix m, Matrix a, Matrix b) {
     assert(a.cols == b.cols);
 
     // Multiply elements
-    for (uint32_t row = 0; row < m.rows; row++) {
-        for (uint32_t col = 0; col < m.cols; col++) {
-            int rows = row * m.cols;
-            m.data[rows + col] = a.data[rows + col] * b.data[rows + col];
-        }
+    for (uint32_t i = 0; i < m.rows * m.cols; i++) {
+        m.data[i] = a.data[i] * b.data[i];
     }
 
 }

@@ -19,15 +19,22 @@ int main2(void) {
     Matrix k = matrix_create(3, 3);
     k.data = kernel;
 
-    Matrix b = matrix_create(10,10);
-    for (uint32_t i = 0; i < 100; i++) b.data[i] = i;
+    Matrix a = matrix_create(10,10);
+    for (uint32_t i = 0; i < 100; i++) a.data[i] = i;
 
     Matrix m = matrix_create(8,8);
 
     matrix_print(k);
-    matrix_print(b);
+    matrix_print(a);
 
-    matrix_fft_convolve(m, k, b);
+    matrix_fft_rotate_convolve(m, a, k, true);
+
+    matrix_print(m);
+    
+    // New functionality
+    ConvPlan p = create_conv_plan(a, k);
+    update_kernel(&p);
+    execute_rot_conv(&p, m, true);
 
     matrix_print(m);
 
@@ -177,7 +184,7 @@ int main(void) {
     srand(r);
     // Create neural network
     NeuralNetwork n = create_neural_network(28, 28, COST_CROSS_ENTROPY);
-    convolutional_layer(&n, ACT_RELU, 1, 5, 5);
+    convolutional_layer(&n, ACT_RELU, 10, 5, 5);
     //convolutional_layer(&n, ACT_RELU, 1, 5, 5);
     //set_l2_reg(&n, 1, 0.1);
     max_pooling_layer(&n, 1, 1, 1);
@@ -270,7 +277,7 @@ int main(void) {
         init_screen();
 
         Matrix output = matrix_create(10, 1);
-        Matrix input = matrix_create(784, 1);
+        Matrix input = matrix_create(28, 28);
         uint8_t guess;
 
         add_button(RECT(200, 200, 100, 100), GREEN, print_guess, (void*)&guess);

@@ -10,13 +10,16 @@
 #include "cost.h"
 
 /* TODO
-   - Combine layers into one struct
-   - Consider separating activation functions into their own layer
+   x Combine layers into one struct
    - Add depth to all layers
    - Better optimize the convolution functions. Explore FFT method
+        - Store fft data in special struct
+        - Update copys to be memcpys
+   - Refactor and cleanup code
    - Store layer data, not pointers to layers inside neural net
    - Momentum-based gradient descent
    - Update save/load functionality
+   - Consider separating activation functions into their own layer
    - Model validation checks - e.g. need layer with output between 0 and 1 for cross entropy
 */
 
@@ -43,7 +46,7 @@ void print_neural_network(NeuralNetwork n) {
         printf("    Activation: %s\n", ACT_STR[layer->act_type]);
         printf("    Size: %u\n", layer->size);
         if (layer->type == LAYER_CONVOLUTIONAL)
-            printf("    Dimensions: %u x %u x %u\n",CONV(layer)->num_maps, layer->rows, layer->cols);
+            printf("    Dimensions: %u x %u x %u\n",layer->depth, layer->rows, layer->cols);
         else
             printf("    Dimensions: %u x %u\n",layer->rows, layer->cols);
         printf("    L1 Reg: %f\n", layer->l1_reg);
@@ -82,10 +85,11 @@ NeuralNetwork create_neural_network(uint32_t rows, uint32_t cols, CostFun cost_t
     Layer* layer = calloc(sizeof(Layer), 1);
     layer->type = LAYER_INPUT;
     layer->act_type = ACT_NONE;
-    layer->size = rows * cols;
     layer->rows = rows;
     layer->cols = cols;
-    layer->a = matrix_create(rows * cols, 1);
+    layer->depth = 1;
+    layer->size = rows * cols;
+    layer->a = matrix_create(rows, cols);
 
     n.layers[0] = layer;
     n.layer_count = 1;
@@ -113,7 +117,7 @@ void fully_connected_layer(NeuralNetwork* n, ActFun type, uint32_t rows, uint32_
 
     // Create layer
     uint32_t l = n->layer_count;
-    Layer* layer = calloc(sizeof(FullLayer), 1);
+    Layer* layer = calloc(sizeof(Layer), 1);
     n->layers[l] = layer;
     n->layer_count += 1;
 
@@ -162,18 +166,18 @@ void fully_connected_layer(NeuralNetwork* n, ActFun type, uint32_t rows, uint32_
 
     // Create matrices
     uint32_t prev_size = n->layers[l - 1]->size;
-    FULL(layer)->w = matrix_create(size, prev_size);
-    FULL(layer)->b = matrix_create(size, 1);
-    FULL(layer)->w_g = matrix_create(size, prev_size);
-    FULL(layer)->b_g = matrix_create(size, 1);
-    FULL(layer)->a_m = matrix_create(size, 1);
-    FULL(layer)->s = matrix_create(prev_size, size);
+    layer->w = matrix_create(size, prev_size);
+    layer->b = matrix_create(size, 1);
+    layer->w_g = matrix_create(size, prev_size);
+    layer->b_g = matrix_create(size, 1);
+    layer->a_m = matrix_create(size, 1);
+    layer->s = matrix_create(prev_size, size);
     
     // Initialize weights as random guassian variables
     float mean = 0.0f;
     float stdev = 1.0f / sqrtf(n->layers[l - 1]->size);
-    matrix_initialize_gaussian(FULL(layer)->w, mean, stdev);
-    matrix_initialize_gaussian(FULL(layer)->b, 0.0, 1.0);
+    matrix_initialize_gaussian(layer->w, mean, stdev);
+    matrix_initialize_gaussian(layer->b, 0.0, 1.0);
 
 }
 
@@ -185,7 +189,7 @@ void convolutional_layer(NeuralNetwork* n, ActFun type, uint32_t num_maps, uint3
 
     // Create layer
     uint32_t l = n->layer_count;
-    Layer* layer = calloc(sizeof(ConvLayer), 1);
+    Layer* layer = calloc(sizeof(Layer), 1);
     n->layers[l] = layer;
     n->layer_count += 1;
 
@@ -233,22 +237,48 @@ void convolutional_layer(NeuralNetwork* n, ActFun type, uint32_t num_maps, uint3
     }
 
     // Create feature maps
-    CONV(layer)->num_maps = num_maps;
-    CONV(layer)->map_w = calloc(sizeof(Matrix), num_maps);
-    CONV(layer)->map_wg = calloc(sizeof(Matrix), num_maps);
+    layer->depth = num_maps;
+    layer->height = field_rows;
+    layer->width = field_cols;
+    layer->map_w = calloc(sizeof(Matrix), num_maps);
+    layer->map_wg = calloc(sizeof(Matrix), num_maps);
+    layer->forward_conv = calloc(num_maps, sizeof(ConvPlan));
+    layer->err_conv = calloc(num_maps, sizeof(ConvPlan));
+    layer->grad_conv = calloc(num_maps, sizeof(ConvPlan));
     for (uint32_t i = 0; i < num_maps; i++) {
-        // Create weight matrices
-        CONV(layer)->map_w[i] = matrix_create(field_rows, field_cols);
-        CONV(layer)->map_wg[i] = matrix_create(field_rows, field_cols);
+        // Create weight matrices, padded to size of a for faster computing
+        layer->map_w[i] = matrix_create(field_rows, field_cols);
+        layer->map_wg[i] = matrix_create(field_rows, field_cols);
+
+        // Create convolution plan for forward propgations
+        Matrix a = {.rows = n->layers[l-1]->rows,
+                    .cols = n->layers[l-1]->cols,
+                    .data = n->layers[l-1]->a.data};
+        layer->forward_conv[i] = create_conv_plan(a, layer->map_w[i]);
+
+
+        // Create convolution plan for computing layer errors
+        Matrix e = {.rows = layer->rows,
+                    .cols = layer->cols,
+                    .data = layer->e.data + i * field_rows * field_cols};
+        layer->err_conv[i] = create_conv_plan(e, layer->map_w[i]);
+
+        // Create convolution plan for computing gradients
+        layer->grad_conv[i] = create_conv_plan(a, e);
 
         // Initialize weights
         float mean = 0.0f;
         float stdev = 1.0f / sqrtf(rows * cols);
-        matrix_initialize_gaussian(CONV(layer)->map_w[i], mean, stdev);
+        matrix_initialize_gaussian(layer->map_w[i], mean, stdev);
+
+        // Update padded kernels in convoluton plans
+        update_kernel(&layer->forward_conv[i]);
+        update_kernel(&layer->err_conv[i]);
+        update_kernel(&layer->grad_conv[i]);
     }
-    CONV(layer)->map_b = matrix_create(num_maps, 1);
-    CONV(layer)->map_bg = matrix_create(num_maps, 1);
-    matrix_initialize_gaussian(CONV(layer)->map_b, 0.0, 1.0 / sqrtf(rows * cols));
+    layer->map_b = matrix_create(num_maps, 1);
+    layer->map_bg = matrix_create(num_maps, 1);
+    matrix_initialize_gaussian(layer->map_b, 0.0, 1.0 / sqrtf(rows * cols));
 
 }
 
@@ -259,7 +289,7 @@ void max_pooling_layer(NeuralNetwork* n, uint32_t field_rows, uint32_t field_col
 
     // Create layer
     uint32_t l = n->layer_count;
-    Layer* layer = calloc(sizeof(PoolLayer), 1);
+    Layer* layer = calloc(sizeof(Layer), 1);
     n->layers[l] = layer;
     n->layer_count += 1;
 
@@ -267,7 +297,7 @@ void max_pooling_layer(NeuralNetwork* n, uint32_t field_rows, uint32_t field_col
     Layer* prev_layer = n->layers[l - 1];
     int s_rows = (prev_layer->rows - field_rows) / stride + 1;
     int s_cols = (prev_layer->cols - field_cols) / stride + 1;
-    uint32_t depth = prev_layer->type == LAYER_CONVOLUTIONAL ? CONV(prev_layer)->num_maps : 1;
+    uint32_t depth = prev_layer->type == LAYER_CONVOLUTIONAL ? prev_layer->depth : 1;
     assert(s_rows > 0 && "Invalid receptive field dimensions");
     assert(s_cols > 0 && "Invalid receptive field dimensions");
 
@@ -286,10 +316,10 @@ void max_pooling_layer(NeuralNetwork* n, uint32_t field_rows, uint32_t field_col
     layer->a_j = matrix_create(size, 1);
     matrix_ones(layer->a_j);
 
-    POOL(layer)->depth = depth;
-    POOL(layer)->height = field_rows;
-    POOL(layer)->width = field_cols;
-    POOL(layer)->stride = stride;
+    layer->depth = depth;
+    layer->height = field_rows;
+    layer->width = field_cols;
+    layer->stride = stride;
 
 }
 
@@ -383,20 +413,26 @@ void scale_weights_down(NeuralNetwork n) {
 static void propogate_conv(NeuralNetwork n, uint32_t l) {
 
     Layer* layer = n.layers[l];
-    Layer* prev_layer = n.layers[l - 1];
+    //Layer* prev_layer = n.layers[l - 1];
 
     // Loop over each feature map
-    for (uint32_t f = 0; f < CONV(layer)->num_maps; f++) {
+    for (uint32_t f = 0; f < layer->depth; f++) {
 
         uint32_t map_size = layer->rows * layer->cols;
-        Matrix z = {layer->rows, layer->cols, layer->z.data + f * map_size};
-        Matrix a = {prev_layer->rows, prev_layer->cols, prev_layer->a.data};
-        Matrix w = CONV(layer)->map_w[f];
+        Matrix z = {.rows = layer->rows,
+                    .cols = layer->cols,
+                    .data = layer->z.data + f * map_size};
+        //Matrix a = {.rows = prev_layer->rows,
+        //            .cols = prev_layer->cols,
+        //            .data = prev_layer->a.data};
+        //Matrix w = layer->map_w[f];
 
-        matrix_fft_convolve(z, a, w);
+        //matrix_print(w);
+        execute_overlap_conv(&layer->forward_conv[f], z, true);
+        //matrix_fft_convolve(z, a, w, true);
 
         // Now add b to each element
-        float b = CONV(layer)->map_b.data[f];
+        float b = layer->map_b.data[f];
         for (uint32_t i = 0; i < z.rows * z.cols; i++) z.data[i] += b;
     }
 
@@ -408,7 +444,7 @@ void propogate_pool(NeuralNetwork n, uint32_t l) {
     Layer* layer = n.layers[l];
     Layer* prev_layer = n.layers[l - 1];
 
-    for (uint32_t d = 0; d < POOL(layer)->depth; d++) {
+    for (uint32_t d = 0; d < layer->depth; d++) {
 
         // Temporary assert - only support pooling on convolutional layers
         assert(prev_layer->type == LAYER_CONVOLUTIONAL);
@@ -421,13 +457,13 @@ void propogate_pool(NeuralNetwork n, uint32_t l) {
         Matrix a_in  = {.rows = prev_layer->rows,
                         .cols = prev_layer->cols,
                         .data = prev_layer->a.data + d * prev_map_size};
-        uint32_t s = POOL(layer)->stride;
+        uint32_t s = layer->stride;
         for (uint32_t i = 0; i < a_out.rows; i++) {
             for (uint32_t j = 0; j < a_out.cols; j++) {
                 float max = -INFINITY;
-                for (uint32_t p = 0; p < POOL(layer)->height; p++) {
+                for (uint32_t p = 0; p < layer->height; p++) {
                     float* a_in_r  = a_in.data + (s * i + p) * a_in.cols;
-                    for (uint32_t q = 0; q < POOL(layer)->width; q++) {
+                    for (uint32_t q = 0; q < layer->width; q++) {
                         if (a_in_r[s * j + q] > max) max = a_in_r[s * j + q];
                     }
                 }
@@ -459,8 +495,8 @@ void forward_propogate(NeuralNetwork n, Matrix input, Matrix output) {
         switch (n.layers[l]->type) {
         case LAYER_FULLY_CONNECTED: {
             // Multiply matrics
-            matrix_mmult(layer->z, FULL(layer)->w, prev_layer->a);
-            matrix_add(layer->z, 1, FULL(layer)->b);
+            matrix_mmult(layer->z, layer->w, prev_layer->a);
+            matrix_add(layer->z, 1, layer->b);
             layer->act_fun(layer->a, layer->z);
             break;
         }
@@ -517,39 +553,40 @@ void compute_error(NeuralNetwork n, uint32_t l) {
         case LAYER_FULLY_CONNECTED:
             if (layer->a_j.cols == 1) {
                 matrix_cmult(layer->e, 
-                             FULL(next_layer)->w, true,
+                             next_layer->w, true,
                              next_layer->e, false,
                              1.0, 0.0);
                 matrix_hprod(layer->e, layer->e, layer->a_j);
             } else {
-                matrix_cmult(FULL(next_layer)->s,
+                matrix_cmult(next_layer->s,
                          layer->a_j, false, 
-                         FULL(next_layer)->w, true,
+                         next_layer->w, true,
                          1.0, 0.0);
                 matrix_cmult(layer->e,
-                         FULL(next_layer)->s, false, 
+                         next_layer->s, false, 
                          next_layer->e, false,
                          1.0, 0.0);
             }
             break;
         case LAYER_CONVOLUTIONAL:
             matrix_zero(layer->e);
-            for (uint32_t f = 0; f < CONV(next_layer)->num_maps; f++) {
-                uint32_t map_size = next_layer->rows * next_layer->cols;
-                Matrix e_curr = { layer->rows,
-                                  layer->cols, 
-                                  layer->e.data};
-                Matrix e_next = { next_layer->rows,
-                                  next_layer->cols, 
-                                  next_layer->e.data + f * map_size };
-                Matrix w = CONV(next_layer)->map_w[f];
-                full_convolve(e_curr, e_next, w, false);
+            for (uint32_t f = 0; f < next_layer->depth; f++) {
+                //uint32_t map_size = next_layer->rows * next_layer->cols;
+                Matrix e_curr = {.rows = layer->rows,
+                                 .cols = layer->cols, 
+                                 .data = layer->e.data};
+                //Matrix e_next = {.rows = next_layer->rows,
+                //                 .cols = next_layer->cols, 
+                //                 .data = next_layer->e.data + f*map_size};
+                //Matrix w = next_layer->map_w[f];
+                //matrix_fft_full_convolve(e_curr, e_next, w, false);
+                execute_full_conv(&next_layer->err_conv[f], e_curr, false);
             }
             matrix_hprod(layer->e, layer->e, layer->a_j);
             break;
         case LAYER_MAX_POOLING:
             matrix_zero(layer->e);
-            for (uint32_t d = 0; d < POOL(next_layer)->depth; d++) {
+            for (uint32_t d = 0; d < next_layer->depth; d++) {
 
                 assert(layer->act_type != ACT_SOFTMAX);
                 uint32_t curr_map = layer->rows * layer->cols;
@@ -562,19 +599,19 @@ void compute_error(NeuralNetwork n, uint32_t l) {
                                  .data = layer->a.data + d * curr_map};
                 Matrix e_next = {.rows = next_layer->rows,
                                  .cols = next_layer->cols,
-                                 .data = next_layer->e.data + d * pool_map};
+                                 .data = next_layer->e.data + d*pool_map};
                 Matrix a_next = {.rows = next_layer->rows,
                                  .cols = next_layer->cols,
-                                 .data = next_layer->a.data + d * pool_map};
+                                 .data = next_layer->a.data + d*pool_map};
                 
                 // Iterate over each neuron in the next layer
-                uint32_t s = POOL(next_layer)->stride;
+                uint32_t s = next_layer->stride;
                 for (uint32_t i = 0; i < e_next.rows; i++) {
                 for (uint32_t j = 0; j < e_next.cols; j++) {
                     float max = a_next.data[i * a_next.cols + j];
                     // Find the max neuron, and add the associated erro
-                    for (uint32_t p = 0; p < POOL(next_layer)->height; p++) {
-                    for (uint32_t q = 0; q < POOL(next_layer)->width; q++) {
+                    for (uint32_t p = 0; p < next_layer->height; p++) {
+                    for (uint32_t q = 0; q < next_layer->width; q++) {
                         uint32_t c = (s * i + p) * a_curr.cols + s * j + q;
                         if (a_curr.data[c] == max) 
                             e_curr.data[c] += e_next.data[i * e_next.cols + j];
@@ -599,26 +636,36 @@ void compute_gradient(NeuralNetwork n, uint32_t l) {
     switch (layer->type) {
     case LAYER_FULLY_CONNECTED:
         // Calculate gradients
-        matrix_cmult(FULL(layer)->w_g,
+        matrix_cmult(layer->w_g,
                      layer->e, false, 
                      prev_layer->a, true, 
                      1.0f, 1.0f);
-        matrix_add(FULL(layer)->b_g, 1.0, layer->e);
+        matrix_add(layer->b_g, 1.0, layer->e);
         break;
     case LAYER_CONVOLUTIONAL:
-        for (uint32_t f = 0; f < CONV(layer)->num_maps; f++) {
+        for (uint32_t f = 0; f < layer->depth; f++) {
 
             // Calculate w gradient
             uint32_t map_size = layer->rows * layer->cols;
-            Matrix w_g = CONV(layer)->map_wg[f];
-            Matrix e = {layer->rows, layer->cols, layer->e.data + f * map_size};
-            Matrix a = {prev_layer->rows, prev_layer->cols, prev_layer->a.data};
-            rotate_convolve(w_g, a, e, false);
+            Matrix w_g = layer->map_wg[f];
+            //Matrix e = {.rows = layer->rows,
+            //            .cols = layer->cols,
+            //            .data = layer->e.data + f * map_size};
+            //Matrix a = {.rows = prev_layer->rows,
+            //            .cols = prev_layer->cols,
+            //            .data = prev_layer->a.data};
+
+            //matrix_fft_rotate_convolve(w_g, a, e, false);
+            update_kernel(&layer->grad_conv[f]);
+            execute_rot_conv(&layer->grad_conv[f], w_g, false);
 
             // Calculate b gradient
-            float* b_g = CONV(layer)->map_bg.data + f;
+            Matrix e = {.rows = layer->rows,
+                        .cols = layer->cols,
+                        .data = layer->e.data + f * map_size};
+            float* b_g = layer->map_bg.data + f;
             for (uint32_t r = 0; r < layer->rows; r++) {
-                float* e_r = e.data + r * layer->rows;
+                float* e_r = e.data + r * layer->cols;
                 for (uint32_t c = 0; c < layer->cols; c++) {
                     *b_g += e_r[c];
                 }
@@ -665,14 +712,14 @@ void gradient_descent(NeuralNetwork n, size_t batch_size, size_t training_size, 
     for (uint32_t l = 1; l < n.layer_count; l++) {
         switch (n.layers[l]->type) {
         case LAYER_FULLY_CONNECTED:
-            matrix_zero(FULL(n.layers[l])->w_g);
-            matrix_zero(FULL(n.layers[l])->b_g);
+            matrix_zero(n.layers[l]->w_g);
+            matrix_zero(n.layers[l]->b_g);
             break;
         case LAYER_CONVOLUTIONAL:
-            for (uint32_t f = 0; f < CONV(n.layers[l])->num_maps; f++) {
-                matrix_zero(CONV(n.layers[l])->map_wg[f]);
+            for (uint32_t f = 0; f < n.layers[l]->depth; f++) {
+                matrix_zero(n.layers[l]->map_wg[f]);
             }
-            matrix_zero(CONV(n.layers[l])->map_bg);
+            matrix_zero(n.layers[l]->map_bg);
             break;
         case LAYER_MAX_POOLING:
             break;  // No parameters to train
@@ -694,12 +741,12 @@ void gradient_descent(NeuralNetwork n, size_t batch_size, size_t training_size, 
         switch (n.layers[l]->type) {
         case LAYER_FULLY_CONNECTED: {
             
-            FullLayer* layer = FULL(n.layers[l]);
+            Layer* layer = n.layers[l];
 
             // Apply l1 regularization, if applicable
-            if (LAYER(layer)->l1_reg > 0.0f) {
+            if (layer->l1_reg > 0.0f) {
                 for (uint32_t j = 0; j < layer->w.rows; j++) {
-                    float scale = eta * LAYER(layer)->l1_reg / (float)training_size;
+                    float scale = eta * layer->l1_reg / (float)training_size;
                     float w = layer->w.data[j];
                     float sgn = (w > 0) - (w < 0);
                     layer->w.data[j] -= scale * sgn;
@@ -707,8 +754,8 @@ void gradient_descent(NeuralNetwork n, size_t batch_size, size_t training_size, 
             }
 
             // Apply l2 regularization, if applicable
-            if (LAYER(layer)->l2_reg > 0.0f) {
-                float scale = 1.0f - (eta * LAYER(layer)->l2_reg / (float)training_size);
+            if (layer->l2_reg > 0.0f) {
+                float scale = 1.0f - (eta * layer->l2_reg / (float)training_size);
                 matrix_smult(layer->w, layer->w, scale);
             }
 
@@ -717,12 +764,12 @@ void gradient_descent(NeuralNetwork n, size_t batch_size, size_t training_size, 
             break;
         }
         case LAYER_CONVOLUTIONAL: {
-            ConvLayer* layer = CONV(n.layers[l]);
-            for (uint32_t f = 0; f < layer->num_maps; f++) {
+            Layer* layer = n.layers[l];
+            for (uint32_t f = 0; f < layer->depth; f++) {
                 // Apply l1 regularization, if applicable
-                if (LAYER(layer)->l1_reg > 0.0f) {
+                if (layer->l1_reg > 0.0f) {
                     for (uint32_t j = 0; j < layer->map_w[f].rows; j++) {
-                        float scale = eta * LAYER(layer)->l1_reg / (float)training_size;
+                        float scale = eta * layer->l1_reg / (float)training_size;
                         float w = layer->map_w[f].data[j];
                         float sgn = (w > 0) - (w < 0);
                         layer->map_w[f].data[j] -= scale * sgn;
@@ -730,11 +777,13 @@ void gradient_descent(NeuralNetwork n, size_t batch_size, size_t training_size, 
                 }
 
                 // Apply l2 regularization, if applicable
-                if (LAYER(layer)->l2_reg > 0.0f) {
-                    float scale = 1.0f - (eta * LAYER(layer)->l2_reg / (float)training_size);
+                if (layer->l2_reg > 0.0f) {
+                    float scale = 1.0f - (eta * layer->l2_reg / (float)training_size);
                     matrix_smult(layer->map_w[f], layer->map_w[f], scale);
                 }
                 matrix_add(layer->map_w[f], -learning_rate, layer->map_wg[f]);
+                update_kernel(&layer->forward_conv[f]);
+                update_kernel(&layer->err_conv[f]);
             }
             matrix_add(layer->map_b, -learning_rate, layer->map_bg);
         }
@@ -792,6 +841,7 @@ void stochastic_gradient_descent(NeuralNetwork n, size_t training_size, Matrix* 
 
 }
 
+/*
 void write_matrix(FILE* f, Matrix m) {
 
     // Write rows
@@ -835,7 +885,6 @@ int read_matrix(FILE* f, Matrix m) {
     return 0;
 }
 
-/*
 // Save neural network to file
 int save_neural_network(NeuralNetwork n, const char* path) {
 

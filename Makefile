@@ -2,7 +2,7 @@
 CC = clang
 
 # Compiler Flags:
-CFLAGS = -g -Wall -Wpedantic -Wextra -fsanitize=address,undefined,signed-integer-overflow
+CFLAGS = -g -Wall -Wpedantic -Wextra -Og -fsanitize=address,undefined,signed-integer-overflow
 
 # SDL2 flags
 CFLAGS += -I/opt/homebrew/Cellar/sdl2/2.28.5/include/SDL2

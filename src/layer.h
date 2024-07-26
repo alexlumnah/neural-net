@@ -1,6 +1,8 @@
 #ifndef LAYER_H
 #define LAYER_H
 
+#include "convolve.h"
+
 typedef void (*ActPtr)(Matrix, Matrix);
 typedef float (*CostPtr)(Matrix, Matrix);
 typedef void (*CostGradPtr)(Matrix, Matrix, Matrix);
@@ -13,10 +15,12 @@ typedef enum LayerType {
 } LayerType;
 
 typedef struct Layer {
+    // General Parameters
     LayerType type;
-    uint32_t size;          // Number of neurons
     uint32_t rows;          // Number of rows
     uint32_t cols;          // Number of cols
+    uint32_t depth;         // Depth of layer
+    uint32_t size;          // Number of neurons
     Matrix z;               // Weighted Sum
     Matrix a;               // Neuron Activation
     Matrix e;               // Neuron Error
@@ -32,10 +36,6 @@ typedef struct Layer {
     float l1_reg;           // L1 Regularization Parameter
     float l2_reg;           // L2 Regularization Parameter
     float drop_rate;        // Dropout Rate
-} Layer;
-
-typedef struct FullLayer {
-    Layer layer;
 
     // Fully Connected Layer
     Matrix w;               // Weights
@@ -45,30 +45,20 @@ typedef struct FullLayer {
     Matrix a_m;             // Neuron Mask for Drop Out
     Matrix s;               // Scratch matrix for intermediate calc
 
-} FullLayer;
-
-typedef struct ConvLayer {
-    Layer layer;
-
     // Convolutional Layer Parameters
-    uint32_t num_maps;      // Number of Feature Maps
     Matrix* map_w;          // Feature Maps
     Matrix* map_wg;         // Map Gradients
     Matrix map_b;           // Map biases
     Matrix map_bg;          // Map bias gradients
-
-} ConvLayer;
-
-typedef struct PoolLayer {
-    Layer layer;
+    ConvPlan* forward_conv; // Plan for forward convolution
+    ConvPlan* err_conv;     // Plan for error convolution
+    ConvPlan* grad_conv;    // Plan for gradient convolution
 
     // Pool Layer Parameters
-    uint32_t depth;         // Number of Feature Maps
-    uint32_t width;
-    uint32_t height;
-    uint32_t stride;
-
-} PoolLayer;
+    uint32_t width;         // Width of pool window
+    uint32_t height;        // Height of pool window
+    uint32_t stride;        // Stride taken when pooling
+} Layer;
 
 static const char* LAYER_STR[] = {
     "INPUT",
@@ -76,12 +66,6 @@ static const char* LAYER_STR[] = {
     "CONVOLUTIONAL",
     "MAX_POOLING",
 };
-
-#define LAYER(l) ((Layer*)(l))
-#define INPUT(l) ((InputLayer*)(l))
-#define FULL(l)  ((FullLayer*)(l))
-#define CONV(l)  ((ConvLayer*)(l))
-#define POOL(l)  ((PoolLayer*)(l))
 
 #endif // LAYER_H
 
