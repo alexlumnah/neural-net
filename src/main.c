@@ -12,83 +12,6 @@
 
 #define count(list) sizeof(list)/sizeof(list[0])
 
-int main2(void) {
-
-    // Lets test our convolution functions
-    float kernel[] = {0, 1, 2, 3, 4, 5, 6, 7, 8};
-    Matrix k = matrix_create(3, 3);
-    k.data = kernel;
-
-    Matrix a = matrix_create(10,10);
-    for (uint32_t i = 0; i < 100; i++) a.data[i] = i;
-
-    Matrix m = matrix_create(8,8);
-
-    matrix_print(k);
-    matrix_print(a);
-
-    matrix_fft_rotate_convolve(m, a, k, true);
-
-    matrix_print(m);
-    
-    // New functionality
-    ConvPlan p = create_conv_plan(a, k);
-    update_kernel(&p);
-    execute_rot_conv(&p, m, true);
-
-    matrix_print(m);
-
-    return 0;
-}
-
-
-
-void print_guess(Button* but) {
-    printf("Is this your number? %d\n", (*(uint8_t*)but->state));
-}
-
-void clear_inputs(Button* but) {
-    Matrix* m = (Matrix*)but->state;
-    for (uint32_t i = 0; i < m->rows; i++) {
-        for (uint32_t j = 0; j < m->cols; j++) {
-            m->data[i * m->cols + j] = 0.0f;
-        }
-    }
-}
-
-void update_image(int x, int y, Image* img) {
-    
-    Matrix* m = img->m;
-
-    if (x > img->r.x && x < img->r.x + IMG_COLS * PIXEL_SIZE &&
-        y > img->r.y && y < img->r.y + IMG_ROWS * PIXEL_SIZE) {
-        uint32_t in_col = (x - img->r.x - PIXEL_SIZE/2) / PIXEL_SIZE;
-        uint32_t in_row = (y - img->r.y - PIXEL_SIZE/2) / PIXEL_SIZE;
-        float col_f = (float)((x - img->r.x - PIXEL_SIZE/2) % PIXEL_SIZE) / (float)PIXEL_SIZE;
-        float row_f = (float)((y - img->r.y - PIXEL_SIZE/2) % PIXEL_SIZE) / (float)PIXEL_SIZE;
-
-        col_f = col_f < 0 ? 0 : col_f;
-        row_f = row_f < 0 ? 0 : row_f;
-
-        m->data[in_row * IMG_COLS + in_col] += 1.0 * (1 - col_f) * (1 - row_f);
-        m->data[in_row * IMG_COLS + in_col] = m->data[in_row * IMG_COLS + in_col] > 1 ? 1 : m->data[in_row * IMG_COLS + in_col];
-
-        if (in_col + 1 < IMG_COLS){
-            m->data[in_row * IMG_COLS + in_col + 1] += 1.0 * col_f * (1 - row_f);
-            m->data[in_row * IMG_COLS + in_col + 1] = m->data[in_row * IMG_COLS + in_col + 1] > 1 ? 1 : m->data[in_row * IMG_COLS + in_col + 1];
-        }
-        if (in_row + 1 < IMG_ROWS) {
-            m->data[(in_row + 1) * IMG_COLS + in_col] += 1.0 * (1 - col_f) * (1 - row_f);
-            m->data[(in_row + 1) * IMG_COLS + in_col] = m->data[(in_row + 1) * IMG_COLS + in_col] > 1 ? 1 : m->data[(in_row + 1) * IMG_COLS + in_col];
-        }
-        if (in_row + 1 < IMG_ROWS && in_col + 1 < IMG_COLS) {
-            m->data[(in_row + 1) * IMG_COLS + in_col + 1] += 1.0 * col_f * row_f;
-            m->data[(in_row + 1) * IMG_COLS + in_col + 1] = m->data[(in_row + 1) * IMG_COLS + in_col + 1] > 1 ? 1 : m->data[(in_row + 1) * IMG_COLS + in_col + 1];
-        }
-
-    }
-}
-
 // Find max element in a column matrix
 int find_max(Matrix m) {
     
@@ -103,25 +26,8 @@ int find_max(Matrix m) {
     return loc;
 }
 
-// Evaluate network
-void evaluate_network(NeuralNetwork n, size_t test_size, Matrix* test_inputs, Matrix* expected_outputs, size_t* num_correct, float* cost) {
-
-    *num_correct = 0;
-    *cost = 0;
-    // Now evaluate every single input, test the output
-    Matrix output = matrix_create(expected_outputs[0].rows, expected_outputs[0].cols);
-    for (size_t i = 0; i < test_size; i++) {
-        forward_propogate(n, test_inputs[i], output);
-        if (find_max(expected_outputs[i]) == find_max(output))
-            *num_correct = (*num_correct) + 1;
-        *cost += n.cost_fun(expected_outputs[i], output);
-    }
-    matrix_destroy(&output);
-}
 
 int main(void) {
-
-    srand(1);
 
     // Load training images
     size_t num_images;
@@ -135,8 +41,10 @@ int main(void) {
     // Split out a validation set
     size_t num_val_images = 10000;
     num_images = num_images - num_val_images;
-    //Matrix* val_images = &training_images[num_images];
-    //uint8_t* val_labels = &training_labels[num_images];
+    Matrix* val_images = &training_images[num_images];
+    uint8_t* val_labels = &training_labels[num_images];
+    (void) val_images;  // Suppress compiler warnings when not using validation set
+    (void) val_labels;  // Suppress compiler warnings when not using validation set
 
     // Generate matrix of expected outputs
     Matrix* expected_outputs = calloc(sizeof(Matrix), num_labels);
@@ -182,23 +90,25 @@ int main(void) {
     int r = 10;
     printf("Random seed: %d\n", r);
     srand(r);
+
     // Create neural network
-    NeuralNetwork n = create_neural_network(28, 28, COST_CROSS_ENTROPY);
-    convolutional_layer(&n, ACT_RELU, 10, 5, 5);
-    //convolutional_layer(&n, ACT_RELU, 1, 5, 5);
-    //set_l2_reg(&n, 1, 0.1);
-    max_pooling_layer(&n, 1, 1, 1);
-    //fully_connected_layer(&n, ACT_RELU, 60, 1);
-    //fully_connected_layer(&n, ACT_SIGMOID, 60, 1);
-    fully_connected_layer(&n, ACT_SIGMOID, 10, 1);
-    //set_l2_reg(&n, 2, 0.1);
-    //matrix_print(FULL(n.layers[3])->w);
+    NeuralNetwork* n = create_neural_network(COST_LOG_LIKELIHOOD);
+    input_layer(n, 28, 28);
+    convolutional_layer(n, ACT_RELU, 20, 5, 5);
+    max_pooling_layer(n, 2, 2, 2);
+    convolutional_layer(n, ACT_RELU, 20, 5, 5);
+    max_pooling_layer(n, 2, 2, 2);
+    fully_connected_layer(n, ACT_SIGMOID, 100);
+    //set_l2_reg(n, 1, 5.0f);
+    //set_drop_out(n, 1, 0.25);
+    //fully_connected_layer(n, ACT_SIGMOID, 100, 1);
+    fully_connected_layer(n, ACT_SOFTMAX, 10);
 
     // Lets train our network
     int num_epochs = 30;
     int batch_size = 10;
-    float learning_rate = 0.01;
-    int draw_display = 1;
+    float learning_rate = 0.1;
+    int draw_display = 0;
 
     // Print out hyper parameters
     printf("Training Neural Network\n");
@@ -216,17 +126,17 @@ int main(void) {
     evaluate_network(n, num_test_images, test_images, expected_test_outputs, &success, &cost);
     printf("Starting Benchmark - Number Right: %zu Success Rate: %f Cost: %f\n", success, (float)success/(float)num_test_images, cost);
 
-    /*
+    
     // Initialize screen
     SDL_Rect net_box = RECT(800, 100, 600, 600);
     if (draw_display) {
         init_screen();
         clear_screen();
-        draw_neural_net(net_box, n);
+        draw_fully_connected_network(net_box, *n);
         display_screen();
         handle_inputs();
     }
-    */
+   
 
     // Loop over each epoch
     for (int i = 0; i < num_epochs; i++) {
@@ -235,28 +145,22 @@ int main(void) {
         clock_t begin = clock();
         stochastic_gradient_descent(n, num_images, training_images, expected_outputs, batch_size, learning_rate);
         
-        //matrix_print(CONV(n.layers[1]).map_w[0]);
-        //matrix_print(CONV(n.layers[1]).map_wg[0]);
-        //matrix_print(CONV(n.layers[1]).map_b);
-        //matrix_print(CONV(n.layers[1]).map_bg);
         // Evaluate and print performance
         evaluate_network(n, num_test_images, test_images, expected_test_outputs, &success, &cost);
         printf("Training Round %d Number Right: %zu Success Rate: %f Cost: %f\n", i, success, (float)success/(float)num_test_images, cost);
         printf("Time elapsed: %f\n", (double)(clock() - begin) / (double) CLOCKS_PER_SEC);
 
         // Draw updated neural network
-        /*
         if (draw_display) {
             clear_screen();
-            draw_neural_net(RECT(800, 100, 600, 600), n);
+            draw_fully_connected_network(net_box, *n);
             display_screen();
             handle_inputs();
         }
-        */
     }
 
     // Destroy screen
-    //if (draw_display) destroy_screen();
+    if (draw_display) destroy_screen();
 
     // Save my neural network
     // save_neural_network(n, "test_neural_network_varied.txt");
@@ -280,13 +184,11 @@ int main(void) {
         Matrix input = matrix_create(28, 28);
         uint8_t guess;
 
-        add_button(RECT(200, 200, 100, 100), GREEN, print_guess, (void*)&guess);
-        add_button(RECT(200, 400, 100, 100), RED, clear_inputs, (void*)&input);
-        add_image(400, 200, &input, update_image, NULL);
+        create_digit_classifier_window(&guess, &input);
 
         while (handle_inputs()) {
             clear_screen();
-            //draw_neural_net(RECT(800, 100, 600, 600), n);
+            draw_fully_connected_network(net_box, *n);
             display_screen();
 
             // Guess input

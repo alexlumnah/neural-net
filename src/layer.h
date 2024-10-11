@@ -50,13 +50,13 @@ typedef struct Layer {
     Matrix* map_wg;         // Map Gradients
     Matrix map_b;           // Map biases
     Matrix map_bg;          // Map bias gradients
-    ConvPlan* forward_conv; // Plan for forward convolution
+    ConvPlan* forw_conv;    // Plans for forward convolution
+    ConvPlan* grad_conv;    // Plans for gradient convolution
     ConvPlan* err_conv;     // Plan for error convolution
-    ConvPlan* grad_conv;    // Plan for gradient convolution
 
-    // Pool Layer Parameters
-    uint32_t width;         // Width of pool window
-    uint32_t height;        // Height of pool window
+    // Pool Layer / Convolutional Layer Parameters
+    uint32_t width;         // Width of pool window / feature map
+    uint32_t height;        // Height of pool window / feature map
     uint32_t stride;        // Stride taken when pooling
 } Layer;
 

@@ -59,14 +59,14 @@ void init_screen(void);
 void clear_screen(void);
 void display_screen(void);
 void destroy_screen(void);
+int handle_inputs(void);
 
 void add_button(SDL_Rect r, SDL_Color c, void (*callback)(Button*), void* state);
 void add_image(int x, int y, Matrix* m, void (*callback)(int, int, Image*), void* state);
 
-void draw_neural_net(SDL_Rect r, NeuralNetwork n);
-void draw_cost_plot(SDL_Rect r, Matrix* cost);
+void draw_fully_connected_network(SDL_Rect r, NeuralNetwork n);
 
-int handle_inputs(void);
+void create_digit_classifier_window(uint8_t* guess, Matrix* image);
 
 #endif // UI_H
 

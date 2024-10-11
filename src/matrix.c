@@ -7,13 +7,6 @@
 
 #include "matrix.h"
 
-/*
-typedef struct Matrix {
-    uint32_t rows, cols;      // Num Rows, Num Cols
-    float* data;              // m x n Matrix - index with m*j + i
-} Matrix;
-*/
-
 // Print Matrix
 void matrix_print(Matrix m) {
     printf("%d x %d Matrix:\n", m.rows, m.cols);
@@ -64,8 +57,12 @@ void matrix_add(Matrix m, float c, Matrix a) {
 
     // First we store a in m, then add b to m
     // cblas_sgeadd: C = alpha * A + beta * C
-    // cblas_sgeadd(CBLAS_ORDER, rows, cols, alpha, *A, a_width, beta, *C, c_width)
-    cblas_sgeadd(CblasRowMajor, m.rows, m.cols, c, a.data, a.cols, 1, m.data, m.cols);
+    // cblas_sgeadd(CBLAS_ORDER, rows, cols,
+    //              alpha, *A, a_width,
+    //              beta,  *C, c_width)
+    cblas_sgeadd(CblasRowMajor, m.rows, m.cols,
+                 c,    a.data, a.cols,
+                 1.0f, m.data, m.cols);
 
 }
 
@@ -80,9 +77,13 @@ void matrix_sum(Matrix m, Matrix a, Matrix b) {
 
     // First we store a in m, then add b to m
     // cblas_sgeadd: C = alpha * A + beta * C
-    // cblas_sgeadd(CBLAS_ORDER, rows, cols, alpha, *A, a_width, beta, *C, c_width)
-    cblas_sgeadd(CblasRowMajor, m.rows, m.cols, 1, a.data, a.cols, 0, m.data, m.cols);
-    cblas_sgeadd(CblasRowMajor, m.rows, m.cols, 1, b.data, b.cols, 1, m.data, m.cols);
+    // cblas_sgeadd(CBLAS_ORDER, rows, cols,
+    //              alpha, *A, a_width,
+    //              beta,  *C, c_width)
+    memcpy(m.data, a.data, m.rows * m.cols * sizeof(float));
+    cblas_sgeadd(CblasRowMajor, m.rows, m.cols,
+                 1.0f, b.data, b.cols,
+                 1.0f, m.data, m.cols);
 
 }
 
@@ -97,9 +98,13 @@ void matrix_diff(Matrix m, Matrix a, Matrix b) {
 
     // First we store a in m, then add -b to m
     // cblas_sgeadd: C = alpha * A + beta * C
-    // cblas_sgeadd(CBLAS_ORDER, rows, cols, alpha, *A, a_width, beta, *C, c_width)
-    cblas_sgeadd(CblasRowMajor, m.rows, m.cols, 1, a.data, a.cols, 0, m.data, m.cols);
-    cblas_sgeadd(CblasRowMajor, m.rows, m.cols, -1, b.data, b.cols, 1, m.data, m.cols);
+    // cblas_sgeadd(CBLAS_ORDER, rows, cols,
+    //              alpha, *A, a_width,
+    //              beta,  *C, c_width)
+    memcpy(m.data, a.data, m.rows * m.cols * sizeof(float));
+    cblas_sgeadd(CblasRowMajor, m.rows, m.cols,
+                -1.0f, b.data, b.cols,
+                 1.0f, m.data, m.cols);
 }
 
 // Scalar multiply m = (c * a)
@@ -107,8 +112,12 @@ void matrix_smult(Matrix m, Matrix a, float c) {
 
     // Multiply by Scalar
     // cblas_sgeadd: C = alpha * A + beta * C
-    // cblas_sgeadd(CBLAS_ORDER, rows, cols, alpha, *A, a_width, beta, *C, c_width)
-    cblas_sgeadd(CblasRowMajor, m.rows, m.cols, c, a.data, a.cols, 0, m.data, m.cols);
+    // cblas_sgeadd(CBLAS_ORDER, rows, cols,
+    //              alpha, *A, a_width,
+    //              beta,  *C, c_width)
+    cblas_sgeadd(CblasRowMajor, m.rows, m.cols,
+                 c,    a.data, a.cols,
+                 0.0f, m.data, m.cols);
 }
 
 // Matrix multiply m = (a * b)
@@ -120,17 +129,25 @@ void matrix_mmult(Matrix m, Matrix a, Matrix b) {
     assert(a.cols == b.rows);
 
     // Use cblas single precision generic matrix multiplication method
-    // C = alpha * Op(A) * Op(B) + beta * C, where A = m x k, B = k x n, C = m x n matrix
-    // Op(x) = x^T (X-transpose), if specified in argument
-    // cblas_sgemm(CBLAS_ORDER, transpose_A, transpose_B, m, n, k, alpha, *A, a_width, *B, b_width, beta, *C, c_width)
-    cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, m.rows, m.cols, a.cols, 1, a.data, a.cols, b.data, b.cols, 0, m.data, m.cols);
+    // C = alpha * Op(A) * Op(B) + beta * C
+    //     where A = m x k, B = k x n, C = m x n matrix
+    //     Op(x) = x^T (X-transpose), if specified in argument
+    // cblas_sgemm(CBLAS_ORDER, transpose_A, transpose_B,
+    //             m, n, k,
+    //             alpha, *A, a_width, *B, b_width,
+    //             beta,  *C, c_width)
+    cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+                m.rows, m.cols, a.cols,
+                1.0f, a.data, a.cols,
+                      b.data, b.cols,
+                0.0f, m.data, m.cols);
 
 }
 
 // Complex Matrix Product, Using all the tools cblas has to offer
 void matrix_cmult(Matrix m, Matrix a, bool a_t, Matrix b, bool b_t, float alpha, float beta) {
 
-    // Assert we have compatible dimensions, even if we are transposing matrices
+    // Assert we have compatible dimensions
     uint32_t a_rows = (a_t ? a.cols : a.rows);
     uint32_t a_cols = (a_t ? a.rows : a.cols);
     uint32_t b_rows = (b_t ? b.cols : b.rows);
@@ -140,10 +157,20 @@ void matrix_cmult(Matrix m, Matrix a, bool a_t, Matrix b, bool b_t, float alpha,
     assert(a_cols = b_rows);
 
     // Use cblas single precision generic matrix multiplication method
-    // C = alpha * Op(A) * Op(B) + beta * C, where A = m x k, B = k x n, C = m x n matrix
-    // Op(x) = x^T (X-transpose), if specified in argument
-    // cblas_sgemm(CBLAS_ORDER, transpose_A, transpose_B, m, n, k, alpha, *A, a_width, *B, b_width, beta, *C, c_width)
-    cblas_sgemm(CblasRowMajor, a_t ? CblasTrans : CblasNoTrans, b_t ? CblasTrans : CblasNoTrans, m.rows, m.cols, a_cols, alpha, a.data, a.cols, b.data, b.cols, beta, m.data, m.cols);
+    // C = alpha * Op(A) * Op(B) + beta * C
+    //     where A = m x k, B = k x n, C = m x n matrix
+    //     Op(x) = x^T (X-transpose), if specified in argument
+    // cblas_sgemm(CBLAS_ORDER, transpose_A, transpose_B,
+    //             m, n, k,
+    //             alpha, *A, a_width, *B, b_width,
+    //             beta,  *C, c_width)
+    cblas_sgemm(CblasRowMajor,
+                a_t ? CblasTrans : CblasNoTrans,
+                b_t ? CblasTrans : CblasNoTrans,
+                m.rows, m.cols, a_cols,
+                alpha, a.data, a.cols,
+                       b.data, b.cols,
+                beta,  m.data, m.cols);
 }
 
 // Efficient multiplication of a diagonal matrix by a vector
@@ -183,10 +210,9 @@ void matrix_transpose(Matrix m, Matrix a) {
     assert(m.rows == a.cols);
     assert(m.cols == a.rows);
 
-    for (uint32_t row = 0; row < m.rows; row++) {
-        for (uint32_t col = 0; col < m.cols; col++) {
-            int rows = row * m.cols;
-            m.data[rows + col] = a.data[col * a.cols + row];
+    for (uint32_t i = 0; i < m.rows; i++) {
+        for (uint32_t j = 0; j < m.cols; j++) {
+            m.data[i * m.cols + j] = a.data[j * a.cols + i];
         }
     }
 
@@ -199,10 +225,9 @@ void matrix_activation(Matrix m, Matrix a, float act(float)) {
     assert(m.rows == a.rows);
     assert(m.cols == a.cols);
 
-    for (uint32_t row = 0; row < a.rows; row++) {
-        for (uint32_t col = 0; col < a.cols; col++) {
-            int rows = row * m.cols;
-            m.data[rows + col] = act(a.data[rows + col]);
+    for (uint32_t i = 0; i < a.rows; i++) {
+        for (uint32_t j = 0; j < a.cols; j++) {
+            m.data[i * m.cols + j] = act(a.data[i * m.cols + j]);
         }
     }
 
@@ -221,21 +246,20 @@ float random_gaussian(float mean, float stdev) {
 void matrix_initialize_random(Matrix m) {
 
     // Initialize all values to random float between -1 and 1
-    for (uint32_t row = 0; row < m.rows; row++) {
-        for (uint32_t col = 0; col < m.cols; col++) {
-            int rows = row * m.cols;
-            m.data[rows + col] = -1.0 + 2.0*((float)(rand()) / (float)(RAND_MAX));
+    for (uint32_t i = 0; i < m.rows; i++) {
+        for (uint32_t j = 0; j < m.cols; j++) {
+            m.data[i * m.cols + j] = -1.0 + 2.0*((float)(rand()) / (float)(RAND_MAX));
         }
     }
 }
 
+// Initalize all elements to random value with guassian distribution
 void matrix_initialize_gaussian(Matrix m, float mean, float stdev) {
 
     // Initialize all values to random float between -1 and 1
-    for (uint32_t row = 0; row < m.rows; row++) {
-        for (uint32_t col = 0; col < m.cols; col++) {
-            int rows = row * m.cols;
-            m.data[rows + col] = random_gaussian(mean, stdev);
+    for (uint32_t i = 0; i < m.rows; i++) {
+        for (uint32_t j = 0; j < m.cols; j++) {
+            m.data[i * m.cols + j] = random_gaussian(mean, stdev);
         }
     }
 }

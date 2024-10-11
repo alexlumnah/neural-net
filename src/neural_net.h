@@ -17,33 +17,38 @@ typedef struct NeuralNetwork {
     CostPtr cost_fun;       // Cost Function Pointer
     CostGradPtr cost_grad;  // Cost Gradient Pointer
 
-    int apply_dropout;      // Flag to apply dropout during training
+    bool apply_dropout;      // Flag to apply dropout during training
 } NeuralNetwork;
 
-void print_neural_network(NeuralNetwork n);
 
-NeuralNetwork create_neural_network(uint32_t rows, uint32_t cols, CostFun cost_type);
-void destroy_neural_network(NeuralNetwork n);
+// Create/Destroy Network
+NeuralNetwork* create_neural_network(CostFun cost_type);
+void destroy_neural_network(NeuralNetwork* n);
 
-void fully_connected_layer(NeuralNetwork* n, ActFun type, uint32_t rows, uint32_t cols);
+// Add Layers to Netowrk
+void input_layer(NeuralNetwork* n, uint32_t rows, uint32_t cols);
+void fully_connected_layer(NeuralNetwork* n, ActFun type, uint32_t size);
 void convolutional_layer(NeuralNetwork* n, ActFun type, uint32_t num_maps, uint32_t field_rows, uint32_t field_cols);
 void max_pooling_layer(NeuralNetwork* n, uint32_t field_rows, uint32_t field_cols, uint32_t stride);
 
-void forward_propogate(NeuralNetwork n, Matrix input, Matrix output);
-void back_propogate(NeuralNetwork n, Matrix exp_output, Matrix act_output);
-void gradient_descent(NeuralNetwork n, size_t batch_size, size_t training_size, Matrix* training_inputs, Matrix* expected_outputs, float eta);
-void stochastic_gradient_descent(NeuralNetwork n, size_t training_size, Matrix* training_inputs, Matrix* training_outputs, size_t batch_size, float eta);
+// Propogate Input Through Network
+void forward_propogate(NeuralNetwork* n, Matrix input, Matrix output);
 
-void set_l1_reg(NeuralNetwork *n, uint32_t l, float lambda);
-void set_l2_reg(NeuralNetwork *n, uint32_t l, float lambda);
-void set_drop_out(NeuralNetwork *n, float drop_rate);
+// Train Network
+void gradient_descent(NeuralNetwork* n, size_t batch_size, size_t training_size, Matrix* training_inputs, Matrix* expected_outputs, float eta);
+void stochastic_gradient_descent(NeuralNetwork* n, size_t training_size, Matrix* training_inputs, Matrix* training_outputs, size_t batch_size, float eta);
+void evaluate_network(NeuralNetwork* n, size_t test_size, Matrix* test_inputs, Matrix* expected_outputs, size_t* num_correct, float* cost);
 
-void init_drop_masks(NeuralNetwork n);
-void update_drop_masks(NeuralNetwork n);
-void scale_weights_up(NeuralNetwork n);
-void scale_weights_down(NeuralNetwork n);
+// Set Regularization Parameters
+void set_l1_reg(NeuralNetwork* n, uint32_t l, float lambda);
+void set_l2_reg(NeuralNetwork* n, uint32_t l, float lambda);
+void set_drop_out(NeuralNetwork* n, uint32_t l, float drop_rate);
 
-int save_neural_network(NeuralNetwork n, const char* path);
+// Print Network
+void print_neural_network(NeuralNetwork* n);
+
+// Save/Load Network
+int save_neural_network(NeuralNetwork* n, const char* path);
 int load_neural_network(const char* path, NeuralNetwork* np);
 
 #endif  // NEURAL_NET_H

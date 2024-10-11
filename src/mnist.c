@@ -36,7 +36,7 @@ size_t load_images(const char* path, Matrix** images) {
 
     // Read each image in the data set
     for (int n = 0; n < num_images; n++) {
-        (*images)[n] = matrix_create(num_rows, num_cols); // Create a column vector of inputs
+        (*images)[n] = matrix_create(num_rows, num_cols);
         for (int j = 0; j < num_rows; j++) {
             for (int i = 0; i < num_cols; i++) {
                 uint8_t pixel;
@@ -267,11 +267,4 @@ size_t extend_set(Matrix* images, uint8_t* labels, size_t num_images, Matrix** n
 
     return num_images;
 }
-
-
-
-
-
-
-
 
